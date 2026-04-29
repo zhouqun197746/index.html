@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>周群 · 动态视觉设计师 | Portfolio</title>
+    <style>
+        :root {
+            --bg-color: #050505;
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0a0;
+            --accent-color: #ffffff;
+            --card-bg: #121212;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* 导航栏 */
+        .header {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 1000;
+            padding: 1.5rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            mix-blend-mode: difference;
+        }
+
+        .logo {
+            font-size: 1.2rem;
+            font-weight: 700;
+            letter-spacing: 2px;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2.5rem;
+        }
+
+        .nav-links a {
+            color: var(--text-primary);
+            text-decoration: none;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: opacity 0.3s;
+        }
+
+        .nav-links a:hover {
+            opacity: 0.6;
+        }
+
+        /* Hero 区域 */
+        .hero {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 0 10%;
+        }
+
+        .hero h1 {
+            font-size: clamp(3rem, 10vw, 7rem);
+            font-weight: 800;
+            line-height: 1.1;
+            margin-bottom: 1rem;
+        }
+
+        .hero p {
+            color: var(--text-secondary);
+            font-size: clamp(0.9rem, 2vw, 1.2rem);
+            max-width: 700px;
+        }
+
+        /* 作品网格 */
+        .works-section {
+            padding: 4rem 2rem;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .works-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .work-card {
+            background: var(--card-bg);
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+            cursor: pointer;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+        }
+
+        .work-card.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .img-container {
+            aspect-ratio: 16 / 9;
+            background: #222;
+            overflow: hidden;
+        }
+
+        .work-card img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.8s ease;
+        }
+
+        .work-card:hover img {
+            transform: scale(1.05);
+        }
+
+        .work-info {
+            padding: 1.5rem;
+        }
+
+        .work-date {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .work-title {
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+
+        /* 弹窗样式 */
+        .modal {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95);
+            z-index: 2000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .modal-content {
+            width: 90%;
+            max-width: 1100px;
+            max-height: 85vh;
+            overflow-y: auto;
+            position: relative;
+            background: #000;
+            padding: 2rem;
+        }
+
+        .close-btn {
+            position: fixed;
+            top: 2rem;
+            right: 2rem;
+            color: #fff;
+            font-size: 2rem;
+            cursor: pointer;
+            z-index: 2100;
+        }
+
+        .video-container {
+            position: relative;
+            padding-bottom: 56.25%;
+            height: 0;
+            margin-bottom: 1.5rem;
+        }
+
+        .video-container iframe {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+        }
+
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 4rem; }
+            .works-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <header class="header">
+        <div class="logo">ZHOU QUN</div>
+        <nav class="nav-links">
+            <a href="#works">Works</a>
+            <a href="#about">About</a>
+        </nav>
+    </header>
+
+    <section class="hero">
+        <h1>周群</h1>
+        <p>资深动态视觉设计师 · 跨越广电与数字艺术，用镜头与粒子书写视觉叙事。</p>
+    </section>
+
+    <section id="works" class="works-section">
+        <div class="works-grid" id="worksContainer">
+            </div>
+    </section>
+
+    <div class="modal" id="modal">
+        <span class="close-btn" id="closeModal">&times;</span>
+        <div class="modal-content">
+            <div id="modalVideo" class="video-container"></div>
+            <h2 id="modalTitle" style="margin-bottom: 1rem;"></h2>
+            <p id="modalDesc" style="color: #ccc;"></p>
+        </div>
+    </div>
+
+    <script>
+        const works = [
+            { id: 1, title: "奔腾正当时：开场视频第二幕", date: "2026.04", tags: ["Motion"], desc: "大型开场视觉呈现。" },
+            { id: 2, title: "默沙东年会", date: "2026.01", tags: ["Event"], desc: "主视觉系统设计。" },
+            { id: 3, title: "张艺谋电影《惊蛰无声》HUD", date: "2025.10", tags: ["Film", "UI"], desc: "电影UI概念设计。" },
+            { id: 4, title: "央视频《闽越王城》展厅", date: "2025.03", tags: ["3D", "Exhibition"], desc: "数字化展厅视觉。" },
+            { id: 5, title: "机器厂全生产线动画", date: "2025.05", tags: ["Industrial"], desc: "工业流程演示。" },
+            { id: 6, title: "家家 IP 形象设计", date: "2025.03", tags: ["Character"], desc: "IP角色视觉开发。" },
+            { id: 7, title: "木兰草原：炙热传说", date: "2025.03", tags: ["Motion"], desc: "文旅项目动态视觉。" },
+            { id: 8, title: "舞台剧《万里茶道》", date: "2025.05", tags: ["Stage"], desc: "舞台多媒体设计。" },
+            { id: 9, title: "工商银行小智", date: "2023.10", tags: ["Financial"], desc: "IP动画形象设计。" },
+            { id: 10, title: "皮肤缝合器产品动画", date: "2023.03", tags: ["Medical"], desc: "医疗器械三维演示。" },
+            { id: 11, title: "CCTV记录频道：技能人生", date: "2023.02", tags: ["TV"], desc: "频道栏目包装。" },
+            { id: 12, title: "可申达品牌视觉", date: "2022.09", tags: ["Commercial"], desc: "品牌动态视觉开发。" },
+            { id: 13, title: "CCTV7纪录片：卫星过场", date: "2022.11", tags: ["TV"], desc: "卫星过场动画设计。" },
+            { id: 14, title: "CCTV纪录片：大秦岭", date: "2022.06", tags: ["Documentary"], desc: "自然地理视觉包装。" },
+            { id: 15, title: "腾讯：藏经洞", date: "2022.03", tags: ["Cultural"], desc: "数字化文化遗产项目。" },
+            { id: 16, title: "NOVA开场视频", date: "2022.06", tags: ["Motion"], desc: "活动开场动态设计。" },
+            { id: 17, title: "电影《大侦探》片头概念", date: "2022.05", tags: ["Film"], desc: "电影片头概念开发。" },
+            { id: 18, title: "环球时报-文化摇滚", date: "2022.02", tags: ["Media"], desc: "媒体动态海报。" },
+            { id: 19, title: "阅文集团宣传片", date: "2022.04", tags: ["Enterprise"], desc: "企业形象宣传。" },
+            { id: 20, title: "BTV 315晚会", date: "2022", tags: ["TV"], desc: "晚会视觉系统包装。" },
+            { id: 21, title: "舞剧：朴裙", date: "2022.01", tags: ["Art"], desc: "舞台艺术多媒体。" },
+            { id: 22, title: "北京冬奥会-包装", date: "2021.11", tags: ["Sports"], desc: "国际赛事视觉包装。" },
+            { id: 23, title: "腾讯体育-一周说「法」", date: "2021.12", tags: ["Sports"], desc: "体育栏目视觉开发。" },
+            { id: 24, title: "CCTV 博物馆的召唤", date: "2021.08", tags: ["Culture"], desc: "大型文化节目包装。" },
+            { id: 25, title: "奥布替尼产品视觉", date: "2021.09", tags: ["Medical"], desc: "医疗生物视觉。" }
+        ];
+
+        const container = document.getElementById('worksContainer');
+        const modal = document.getElementById('modal');
+        const closeModal = document.getElementById('closeModal');
+
+        // 渲染卡片
+        function render() {
+            works.forEach(work => {
+                const card = document.createElement('div');
+                card.className = 'work-card';
+                card.innerHTML = `
+                    <div class="img-container">
+                        <img src="https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=800&q=80" alt="${work.title}">
+                    </div>
+                    <div class="work-info">
+                        <div class="work-date">${work.date}</div>
+                        <div class="work-title">${work.title}</div>
+                    </div>
+                `;
+                card.onclick = () => openModal(work);
+                container.appendChild(card);
+            });
+
+            // 渐显动画
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('visible'); });
+            }, { threshold: 0.1 });
+            document.querySelectorAll('.work-card').forEach(c => observer.observe(c));
+        }
+
+        function openModal(work) {
+            document.getElementById('modalTitle').textContent = work.title;
+            document.getElementById('modalDesc').textContent = work.desc;
+            document.getElementById('modalVideo').innerHTML = `<p style="color:#555; text-align:center; padding-top:20%;">[ 视频链接待更新: ${work.title} ]</p>`;
+            modal.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        }
+
+        closeModal.onclick = () => {
+            modal.style.display = 'none';
+            document.body.style.overflow = 'auto';
+        };
+
+        window.onclick = (e) => { if(e.target == modal) closeModal.onclick(); };
+
+        render();
+    </script>
+</body>
+</html>
