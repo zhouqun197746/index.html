@@ -114,7 +114,7 @@ async function scrapeThepaper() {
             }
           }
         }
-      } catch {}
+      } catch(e) { process.stdout.write('[thepaper:'+e.message+']'); }
     }
   }
 
@@ -180,7 +180,7 @@ const SOURCES = [
   {id:'huxiu',   label:'虎嗅',        url:'https://www.huxiu.com/article',    domain:'huxiu.com',     rsshub:'/huxiu/article'},
   {id:'lifeweek',label:'三联生活周刊', url:'https://www.lifeweek.com.cn/',     domain:'lifeweek.com.cn', fn:'scrapeLifeweek'},
   {id:'ifeng',   label:'凤凰网资讯',   url:'https://news.ifeng.com/',          domain:'news.ifeng.com', rsshub:'/ifeng/news'},
-  {id:'infzm',   label:'南方周末',     url:'https://www.infzm.com/contents',   domain:'infzm.com',     puppeteer:true},
+  {id:'infzm',   label:'南方周末',     url:'https://www.infzm.com/',   domain:'infzm.com',     puppeteer:true},
   {id:'thepaper',label:'澎湃新闻',     url:'https://www.thepaper.cn/',          domain:'thepaper.cn',   fn:'scrapeThepaper'},
   {id:'wired',   label:'Wired',       url:'https://www.wired.com/',            domain:'wired.com',     rsshub:'/wired'},
   {id:'jiemian', label:'界面新闻',     url:'https://www.jiemian.com/',          domain:'jiemian.com',   rsshub:'/jiemian'},
