@@ -1,10 +1,8 @@
 #!/usr/bin/env node
 
 /**
- * fetch-sources.mjs
- *
- * 多源 RSS 抓取（统一脚本）
- * 策略: RSSHub → 专用爬虫 → 通用简单爬虫 → Puppeteer 渲染
+ * fetch-sources.mjs — 多源 RSS 抓取
+ * 策略: RSSHub → 专用爬虫 → 通用爬虫 → Puppeteer
  */
 
 import { mkdirSync, writeFileSync } from 'fs';
@@ -32,6 +30,7 @@ ${i}
 
 // ===== 专用爬虫 =====
 const SPECIAL = {
+
   /** thepaper.cn — Next.js __NEXT_DATA__ */
   thepaper: async () => {
     const res = await fetch('https://www.thepaper.cn/', {
@@ -40,29 +39,33 @@ const SPECIAL = {
     });
     const html = await res.text();
     const items = []; const seen = new Set();
-    // __NEXT_DATA__ JSON
+
     const m = html.match(/__NEXT_DATA__[^>]*>({.*?})<\/script>/);
     if (m) {
       try {
         const data = JSON.parse(m[1]);
-        const arr = data?.props?.pageProps?.data || [];
-        for (const item of arr) {
-          const title = item.title || item.content_title || '';
+        const pd = data?.props?.pageProps?.data || {};
+        const all = [];
+        for (const k of Object.keys(pd)) {
+          if (Array.isArray(pd[k])) all.push(...pd[k]);
+        }
+        for (const item of all) {
+          const title = item.name || item.title || item.content_title || '';
           const id = item.contId || item.id || '';
-          const link = id ? `https://www.thepaper.cn/newsDetail_forward_${id}` : '';
+          const link = id ? 'https://www.thepaper.cn/newsDetail_forward_' + id : '';
           if (title && link && title.length > 5 && !seen.has(link)) {
-            seen.add(link); items.push({ t:title, l:link, p:new Date().toUTCString() });
+            seen.add(link);
+            items.push({ t: title.replace(/[\uD800-\uDFFF]/g, ''), l: link, p: new Date().toUTCString() });
           }
         }
       } catch {}
     }
-    // 正则兜底
     if (items.length === 0) {
       const urls = [...new Set(html.match(/newsDetail_forward_\d+/g) || [])];
-      for (const p of urls) items.push({ t:`澎湃新闻`, l:`https://www.thepaper.cn/${p}`, p:new Date().toUTCString() });
+      for (const p of urls) items.push({ t:'澎湃新闻', l:'https://www.thepaper.cn/' + p, p: new Date().toUTCString() });
     }
     if (!items.length) throw new Error('No items from thepaper');
-    return items.slice(0,30);
+    return items.slice(0, 30);
   },
 
   /** lifeweek.com.cn — Nuxt.js __NUXT__ */
@@ -73,12 +76,11 @@ const SPECIAL = {
     });
     const html = await res.text();
     const items = []; const seen = new Set();
-    // 从 __NUXT__ 提取 URLs
-    const urls = [...new Set(html.match(/https?:\/\/[^"']*lifeweek[^"']*(?:article|detail|content)[^"']*/g) || [])];
+    const urls = [...new Set(html.match(/https?:\/\/[^"']*lifeweek[^"']*(?:article|detail|content|story)[^"']*/g) || [])];
     const titles = [...html.matchAll(/"title"\s*:\s*"([^"]{8,})"/g)];
     for (let i = 0; i < urls.length; i++) {
-      const t = titles[i]?.[1] || `三联生活周刊`;
-      if (!seen.has(urls[i])) { seen.add(urls[i]); items.push({ t, l:urls[i], p:new Date().toUTCString() }); }
+      const t = titles[i]?.[1] || '三联生活周刊';
+      if (!seen.has(urls[i])) { seen.add(urls[i]); items.push({ t, l: urls[i], p: new Date().toUTCString() }); }
     }
     if (items.length < 3) {
       try {
@@ -104,7 +106,7 @@ const SPECIAL = {
     }
     if (!items.length) throw new Error('No items from lifeweek');
     const unique = items.filter((x,i,a) => a.findIndex(y => y.l === x.l) === i);
-    return unique.slice(0,30);
+    return unique.slice(0, 30);
   },
 };
 
@@ -116,7 +118,7 @@ async function simpleScrape(url, domain) {
   });
   const html = await res.text();
   const items=[]; const seen=new Set();
-  const re = new RegExp(`<a[^>]*href="([^"]*${domain.replace(/\./g,'\\.')}[^"]*)"[^>]*>([^<]{10,})</a>`,'gi');
+  const re = new RegExp('<a[^>]*href="([^"]*' + domain.replace(/\./g,'\\.') + '[^"]*)"[^>]*>([^<]{10,})</a>','gi');
   let m;
   while ((m = re.exec(html)) !== null) {
     let l=m[1]; const t=m[2].replace(/<[^>]*>/g,'').trim();
@@ -136,8 +138,8 @@ async function simpleScrape(url, domain) {
 }
 
 async function rsshubFetch(path) {
-  const res = await fetch(`${RSSHUB}${path}`, {signal:AbortSignal.timeout(15000)});
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const res = await fetch(RSSHUB + path, {signal:AbortSignal.timeout(15000)});
+  if (!res.ok) throw new Error('HTTP ' + res.status);
   const body = await res.text();
   if (!body.trim().startsWith('<?xml') && !body.trim().startsWith('<rss')) throw new Error('Not RSS');
   return body;
@@ -173,7 +175,7 @@ const SOURCES = [
   {id:'wired',   label:'Wired',       url:'https://www.wired.com/',            domain:'wired.com',     rsshub:'/wired'},
   {id:'jiemian', label:'界面新闻',     url:'https://www.jiemian.com/',          domain:'jiemian.com',   rsshub:'/jiemian'},
   {id:'qqnews',  label:'腾讯新闻',     url:'https://news.qq.com/',              domain:'news.qq.com',   puppeteer:true},
-].map(s=>({...s,fn:`${s.id}.xml`}));
+].map(s=>({...s,fn:s.id + '.xml'}));
 
 async function main() {
   const dir = resolve(process.cwd(), OUT);
@@ -181,46 +183,39 @@ async function main() {
   const results = [];
 
   for (const src of SOURCES) {
-    process.stdout.write(`📡 ${src.label.padEnd(8)} `);
+    process.stdout.write(src.label.padEnd(8) + ' ');
     let xml = null;
 
-    // 1) RSSHub
     if (src.rsshub) {
-      try { xml = await rsshubFetch(src.rsshub); const kb=(Buffer.byteLength(xml)/1024).toFixed(1); process.stdout.write(`🐳${kb}KB `); }
-      catch{ process.stdout.write(`🐳✕ `); }
+      try { xml = await rsshubFetch(src.rsshub); const kb=(Buffer.byteLength(xml)/1024).toFixed(1); process.stdout.write('W' + kb + 'KB '); }
+      catch{ process.stdout.write('Wx '); }
     }
-
-    // 2) 专用爬虫
     if (!xml && src.special && SPECIAL[src.special]) {
-      try { const items = await SPECIAL[src.special](); if (items.length>0) { xml = buildRSS(items, src.label, src.url, `${src.label}`, src.fn); const kb=(Buffer.byteLength(xml)/1024).toFixed(1); process.stdout.write(`🔧${kb}KB/${items.length}条 `); } }
-      catch{ process.stdout.write(`🔧✕ `); }
+      try { const items = await SPECIAL[src.special](); if (items.length>0) { xml = buildRSS(items, src.label, src.url, src.label, src.fn); const kb=(Buffer.byteLength(xml)/1024).toFixed(1); process.stdout.write('S' + kb + 'KB/' + items.length + '条 '); } }
+      catch{ process.stdout.write('Sx '); }
     }
-
-    // 3) 通用简单爬虫
     if (!xml) {
-      try { const items = await simpleScrape(src.url, src.domain); if (items.length>0) { xml = buildRSS(items, src.label, src.url, `${src.label}`, src.fn); const kb=(Buffer.byteLength(xml)/1024).toFixed(1); process.stdout.write(`🕸️${kb}KB/${items.length}条 `); } }
-      catch{ process.stdout.write(`🕸️✕ `); }
+      try { const items = await simpleScrape(src.url, src.domain); if (items.length>0) { xml = buildRSS(items, src.label, src.url, src.label, src.fn); const kb=(Buffer.byteLength(xml)/1024).toFixed(1); process.stdout.write('G' + kb + 'KB/' + items.length + '条 '); } }
+      catch{ process.stdout.write('Gx '); }
     }
-
-    // 4) Puppeteer
     if (!xml && src.puppeteer) {
-      try { const items = await puppeteerScrape(src.url, src.domain); if (items.length>0) { xml = buildRSS(items, src.label, src.url, `${src.label}`, src.fn); const kb=(Buffer.byteLength(xml)/1024).toFixed(1); process.stdout.write(`🎭${kb}KB/${items.length}条 `); } }
-      catch{ process.stdout.write(`🎭✕ `); }
+      try { const items = await puppeteerScrape(src.url, src.domain); if (items.length>0) { xml = buildRSS(items, src.label, src.url, src.label, src.fn); const kb=(Buffer.byteLength(xml)/1024).toFixed(1); process.stdout.write('P' + kb + 'KB/' + items.length + '条 '); } }
+      catch{ process.stdout.write('Px '); }
     }
 
     if (xml) {
       writeFileSync(resolve(dir, src.fn), xml, 'utf-8');
-      process.stdout.write(`✅\n`);
+      process.stdout.write('OK\n');
       results.push({l:src.label, ok:true});
     } else {
-      writeFileSync(resolve(dir, src.fn), buildRSS([], `${src.label} - 暂不可用`, src.url, '抓取失败', src.fn), 'utf-8');
-      process.stdout.write(`❌\n`);
+      writeFileSync(resolve(dir, src.fn), buildRSS([], src.label + ' - 暂不可用', src.url, '抓取失败', src.fn), 'utf-8');
+      process.stdout.write('FAIL\n');
       results.push({l:src.label, ok:false});
     }
   }
 
-  console.log(`\n═══════════════════════════════════`);
-  for (const r of results) console.log(`  ${r.ok?'✅':'❌'} ${r.l}`);
+  console.log('\n---');
+  for (const r of results) console.log('  ' + (r.ok?'OK':'FAIL') + ' ' + r.l);
 }
 
-main().catch(e=>{console.error('\n💥',e); process.exit(1);});
+main().catch(e=>{console.error('ERR',e); process.exit(1);});
