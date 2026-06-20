@@ -13,21 +13,40 @@ jobs:
       - name: ⬇️ 检出代码
         uses: actions/checkout@v4
 
-      - name: 🔧 安装 Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: 📦 安装 RSSHub
+      - name: 🐳 启动 RSSHub（Docker）
         run: |
-          npm init -y > /dev/null 2>&1
-          npm install rsshub
+          docker run -d --name rsshub -p 1200:1200 diygod/rsshub
+          echo "等待 RSSHub 启动..."
+          for i in $(seq 1 30); do
+            if curl -s http://localhost:1200/ > /dev/null 2>&1; then
+              echo "✅ RSSHub 已就绪"
+              break
+            fi
+            sleep 2
+          done
 
-      - name: 🚀 启动 RSSHub & 抓取腾讯新闻
-        run: node scripts/fetch-qqnews-rss.mjs
+      - name: 📥 抓取腾讯新闻 RSS
+        run: |
+          mkdir -p rss
+          
+          echo "=== 腾讯新闻-首页信息流 ==="
+          curl -sL -o rss/qqnews.xml http://localhost:1200/tencent/news
+          head -3 rss/qqnews.xml
+          
+          echo "=== 腾讯新闻-综合热榜 ==="
+          curl -sL -o rss/qqnews-rank.xml http://localhost:1200/tencent/news/rank
+          head -3 rss/qqnews-rank.xml
+          
+          echo "=== 腾讯新闻-热点榜 ==="
+          curl -sL -o rss/qqnews-hot.xml http://localhost:1200/tencent/news/rank?type=hotSpot
+          head -3 rss/qqnews-hot.xml
 
       - name: 📋 列出输出文件
         run: ls -lh rss/
+
+      - name: 🧹 清理 Docker 容器
+        if: always()
+        run: docker rm -f rsshub 2>/dev/null || true
 
       - name: 📤 提交 RSS 文件回仓库
         run: |

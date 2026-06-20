@@ -3,129 +3,62 @@
 /**
  * fetch-qqnews-rss.mjs
  *
- * GitHub Actions 中：
- * 1. 启动 RSSHub 服务（child_process）
- * 2. 用 curl 抓取腾讯新闻路由的 RSS XML
- * 3. 保存到 ./rss/ 目录
- * 4. 关闭 RSSHub 进程
+ * GitHub Actions 中用 Docker + curl 抓取腾讯新闻 RSS。
+ * Docker 容器在 workflow 中管理，本脚本只负责 curl 抓取 + 保存。
  *
- * 依赖： npm install rsshub
- * 运行： node scripts/fetch-qqnews-rss.mjs
+ * 用法: node scripts/fetch-qqnews-rss.mjs [rsshub_base_url]
+ * 默认: http://localhost:1200
  */
 
-import { spawn } from 'child_process';
-import { mkdirSync, writeFileSync, existsSync, readFileSync } from 'fs';
+import { mkdirSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
-import http from 'http';
 
-// ===== 配置 =====
-const RSSHUB_PORT = 21200;
+const BASE_URL = process.argv[2] || 'http://localhost:1200';
 const TARGET_DIR = './rss';
-const SERVER_SCRIPT = 'scripts/start-rsshub-server.mjs';
 
 const ROUTES = [
   { path: '/tencent/news',                  file: 'qqnews.xml',        label: '腾讯新闻-首页信息流' },
-  { path: '/tencent/news/rank',              file: 'qqnews-rank.xml',   label: '腾讯新闻-热榜' },
+  { path: '/tencent/news/rank',              file: 'qqnews-rank.xml',   label: '腾讯新闻-综合热榜' },
   { path: '/tencent/news/rank?type=hotSpot', file: 'qqnews-hot.xml',   label: '腾讯新闻-热点榜' },
 ];
 
-// ===== 工具函数 =====
-
-function httpGet(url) {
-  return new Promise((resolve, reject) => {
-    const req = http.get(url, { timeout: 30000 }, (res) => {
-      const chunks = [];
-      res.on('data', (c) => chunks.push(c));
-      res.on('end', () => resolve({ status: res.statusCode, body: Buffer.concat(chunks).toString('utf-8') }));
-    });
-    req.on('error', reject);
-    req.on('timeout', () => { req.destroy(); reject(new Error('请求超时')); });
-  });
-}
-
-async function waitForReady(baseUrl, timeoutMs = 120000) {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    try {
-      const { status } = await httpGet(baseUrl + '/');
-      if (status === 404 || status === 200) return;  // 404 from RSSHub's notFound = server is up
-    } catch { /* 还没起来 */ }
-    await new Promise((r) => setTimeout(r, 2000));
-  }
-  throw new Error('RSSHub 启动超时');
-}
-
 async function main() {
-  console.log('🚀 RSSHub GitHub Actions 抓取器');
-  console.log('═══════════════════════════════════\n');
+  const outputDir = resolve(process.cwd(), TARGET_DIR);
+  mkdirSync(outputDir, { recursive: true });
 
-  console.log(`📡 启动 RSSHub: node ${SERVER_SCRIPT}`);
-  const child = spawn('node', [SERVER_SCRIPT], {
-    stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env, PORT: String(RSSHUB_PORT), NODE_ENV: 'production' },
-  });
+  const results = { success: 0, failed: 0, errors: [] };
 
-  let childExited = false;
-  child.on('exit', (code) => { childExited = true; console.log(`  [rsshub] 退出 code=${code}`); });
-  child.stdout.on('data', (d) => { for (const l of d.toString().trim().split('\n')) if (l) console.log(`  [rsshub] ${l}`); });
-  child.stderr.on('data', (d) => { for (const l of d.toString().trim().split('\n')) if (l) console.log(`  [rsshub] ${l}`); });
+  for (const route of ROUTES) {
+    const url = `${BASE_URL}${route.path}`;
+    process.stdout.write(`📰 [${route.label}] ${url} ... `);
+    try {
+      const res = await fetch(url, { timeout: 30000 });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-  const baseUrl = `http://localhost:${RSSHUB_PORT}`;
-
-  try {
-    console.log('⏳ 等待 RSSHub 就绪（最长 2 分钟）...');
-    await waitForReady(baseUrl);
-    console.log('✅ RSSHub 已就绪\n');
-
-    const outputDir = resolve(process.cwd(), TARGET_DIR);
-    mkdirSync(outputDir, { recursive: true });
-
-    const results = { success: [], failed: [], unchanged: [] };
-
-    for (const route of ROUTES) {
-      console.log(`📰 [${route.label}]`);
-      try {
-        const { status, body } = await httpGet(`${baseUrl}${route.path}`);
-        const filePath = resolve(outputDir, route.file);
-
-        if (status !== 200) throw new Error(`HTTP ${status}`);
-
-        const trimmed = body.trim();
-        if (!trimmed.startsWith('<?xml') && !trimmed.startsWith('<rss')) {
-          console.warn(`  ⚠️ 响应可能不是 RSS XML（前120字符: ${trimmed.slice(0, 120).replace(/\n/g, ' ')}）`);
-        }
-
-        if (existsSync(filePath)) {
-          const old = readFileSync(filePath, 'utf-8');
-          if (old === body) { console.log(`  🔄 无变化，跳过`); results.unchanged.push(route.file); continue; }
-        }
-
-        writeFileSync(filePath, body, 'utf-8');
-        const size = (Buffer.byteLength(body) / 1024).toFixed(1);
-        console.log(`  ✅ → ${route.file} (${size} KB)`);
-        results.success.push(route.file);
-      } catch (err) {
-        console.error(`  ❌ ${err.message}`);
-        results.failed.push({ route: route.path, error: err.message });
+      const body = await res.text();
+      const trimmed = body.trim();
+      if (!trimmed.startsWith('<?xml') && !trimmed.startsWith('<rss')) {
+        console.warn(`⚠️ 可能不是 RSS XML（前80字符: ${trimmed.slice(0, 80).replace(/\n/g, ' ')}）`);
       }
-    }
 
-    console.log('\n═══════════════════════════════════');
-    console.log(`✅ 更新: ${results.success.length}  🔄 未变: ${results.unchanged.length}  ❌ 失败: ${results.failed.length}`);
-    if (results.failed.length > 0) {
-      for (const f of results.failed) console.log(`  - ${f.route}: ${f.error}`);
-      process.exitCode = 1;
-    } else {
-      console.log('🎉 全部完成！');
+      const filePath = resolve(outputDir, route.file);
+      writeFileSync(filePath, body, 'utf-8');
+      const size = (Buffer.byteLength(body) / 1024).toFixed(1);
+      console.log(`✅ ${route.file} (${size} KB)`);
+      results.success++;
+    } catch (err) {
+      console.error(`❌ ${err.message}`);
+      results.failed++;
+      results.errors.push({ route: route.path, error: err.message });
     }
-  } finally {
-    if (!childExited) {
-      console.log('\n🛑 关闭 RSSHub...');
-      child.kill('SIGTERM');
-      await new Promise((r) => setTimeout(r, 5000));
-      if (!childExited) child.kill('SIGKILL');
-    }
+  }
+
+  console.log(`\n═══════════════════════════════════`);
+  console.log(`✅ ${results.success} 成功  ❌ ${results.failed} 失败`);
+  if (results.failed > 0) {
+    for (const e of results.errors) console.log(`  - ${e.route}: ${e.error}`);
+    process.exitCode = 1;
   }
 }
 
-main().catch((err) => { console.error('\n💥 脚本异常:', err); process.exit(1); });
+main();
