@@ -1,2 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0"><channel><title>三联生活周刊 - 抓取失败</title><link>https://example.com/</link><description>抓取失败</description></channel></rss>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+<channel>
+<title>三联生活周刊</title><link>https://www.lifeweek.com.cn/</link><description>三联生活周刊 - SPA 渲染抓取</description><language>zh-CN</language>
+<atom:link href="https://zhouqun197746.github.io/index.html/rss/lifeweek.xml" rel="self" type="application/rss+xml"/>
+
+    <item>
+      <title><![CDATA[zhongdu@lifeweek.com.cn]]></title>
+      <link><![CDATA[mailto:zhongdu@lifeweek.com.cn]]></link>
+      <guid isPermaLink="true"><![CDATA[mailto:zhongdu@lifeweek.com.cn]]></guid>
+      <description><![CDATA[zhongdu@lifeweek.com.cn]]></description>
+      <pubDate>Sat, 20 Jun 2026 04:12:45 GMT</pubDate>
+    </item>
+</channel></rss>
