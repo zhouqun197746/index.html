@@ -3,176 +3,194 @@
 /**
  * fetch-sources.mjs
  *
- * 多源 RSS 抓取脚本：
- * 1. 尝试从 RSSHub Docker 实例抓取（http://localhost:1200）
- * 2. 失败则用 direct_scrapers 中的自带爬虫
+ * 多源 RSS 抓取（统一脚本）
+ * 策略: RSSHub → 简单爬虫 → Puppeteer 渲染
  *
  * 用法: node scripts/fetch-sources.mjs
  */
 
-import { mkdirSync, writeFileSync, existsSync, readFileSync } from 'fs';
+import { mkdirSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 
-// ===== 配置 =====
-const RSSHUB_BASE = 'http://localhost:1200';
-const OUTPUT_DIR = './rss';
+const RSSHUB_BASE = process.env.RSSHUB_URL || 'http://localhost:1200';
+const OUT = './rss';
 
-// ===== 自带爬虫 =====
-const directScrapers = {
-  huxiu: async () => scrapeSimple('https://www.huxiu.com/article', 'huxiu.com', '虎嗅 - 精选文章'),
-  lifeweek: async () => scrapeSimple('https://www.lifeweek.com.cn/', 'lifeweek.com.cn', '三联生活周刊'),
-  ifeng: async () => scrapeSimple('https://news.ifeng.com/', 'ifeng.com', '凤凰网资讯'),
-  infzm: async () => scrapeSimple('https://www.infzm.com/contents', 'infzm.com', '南方周末'),
-  thepaper: async () => scrapeSimple('https://www.thepaper.cn/', 'thepaper.cn', '澎湃新闻'),
-  wired: async () => scrapeSimple('https://www.wired.com/', 'wired.com', 'Wired'),
-  jiemian: async () => scrapeSimple('https://www.jiemian.com/', 'jiemian.com', '界面新闻'),
-};
-
-async function scrapeSimple(url, domain, channelTitle) {
-  const res = await fetch(url, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-    },
-    signal: AbortSignal.timeout(20000),
-  });
-
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const html = await res.text();
-
-  // Extract links with text
-  const items = [];
-  const seen = new Set();
-  const linkRegex = new RegExp(`<a[^>]*href="([^"]*${domain.replace('.', '\.')}[^"]*)"[^>]*>([^<]{10,})</a>`, 'gi');
-  let match;
-  
-  while ((match = linkRegex.exec(html)) !== null) {
-    let link = match[1];
-    const title = match[2].replace(/<[^>]*>/g, '').replace(/[\n\r]/g, ' ').trim();
-    
-    if (link.startsWith('//')) link = 'https:' + link;
-    if (!link.startsWith('http')) continue;
-    if (!title || title.length < 8 || seen.has(link)) continue;
-    
-    seen.add(link);
-    items.push({
-      title,
-      link: link.split('?')[0],
-      desc: title,
-      pubDate: new Date().toUTCString(),
-    });
-  }
-
-  if (items.length === 0) throw new Error(`No items found via regex for ${domain}`);
-  return items.slice(0, 30);
-}
-
-// ===== 源定义 =====
-const SOURCES = [
-  // [id, rsshubPath, directScraper?]
-  { id: 'huxiu',    label: '虎嗅',          rsshub: '/huxiu/article',       direct: 'huxiu' },
-  { id: 'lifeweek', label: '三联生活周刊',   rsshub: '/lifeweek',            direct: 'lifeweek' },
-  { id: 'ifeng',    label: '凤凰网资讯',     rsshub: '/ifeng/news',          direct: 'ifeng' },
-  { id: 'infzm',    label: '南方周末',       rsshub: '/infzm',               direct: 'infzm' },
-  { id: 'thepaper', label: '澎湃新闻',       rsshub: '/thepaper',            direct: 'thepaper' },
-  { id: 'wired',    label: 'Wired',         rsshub: '/wired',               direct: 'wired' },
-  { id: 'jiemian',  label: '界面新闻',       rsshub: '/jiemian',             direct: 'jiemian' },
-];
-
-// 保留腾讯新闻（已有）
-const QQLABEL = '腾讯新闻';
-
-function buildRSS(items, channelTitle, channelLink, channelDesc) {
-  const itemXML = items.map((item) => `
+// ===== RSS 构建器 =====
+function buildRSS(items, title, link, desc, filename) {
+  const itemsXml = items.map(i => `
     <item>
-      <title><![CDATA[${item.title.replace(/\]\]>/g, ']]&gt;')}]]></title>
-      <link><![CDATA[${item.link}]]></link>
-      <guid isPermaLink="true"><![CDATA[${item.link}]]></guid>
-      <description><![CDATA[${(item.desc || item.title).replace(/\]\]>/g, ']]&gt;')}]]></description>
-      <pubDate>${item.pubDate}</pubDate>
+      <title><![CDATA[${(i.t||'').replace(/\]\]>/g,']]&gt;')}]]></title>
+      <link><![CDATA[${i.l||'https://example.com/'}]]></link>
+      <guid isPermaLink="true"><![CDATA[${i.l||'https://example.com/'}]]></guid>
+      <description><![CDATA[${(i.d||i.t||'').replace(/\]\]>/g,']]&gt;')}]]></description>
+      <pubDate>${i.p||new Date().toUTCString()}</pubDate>
     </item>`).join('');
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
-  <channel>
-    <title>${channelTitle}</title>
-    <link>${channelLink}</link>
-    <description>${channelDesc}</description>
-    <language>zh-CN</language>
-    <atom:link href="https://zhouqun197746.github.io/index.html/rss/${channelTitle.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.xml" rel="self" type="application/rss+xml"/>
-    ${itemXML}
-  </channel>
-</rss>`;
+<channel>
+<title>${title}</title><link>${link}</link><description>${desc}</description><language>zh-CN</language>
+<atom:link href="https://zhouqun197746.github.io/index.html/rss/${filename}" rel="self" type="application/rss+xml"/>
+${itemsXml}
+</channel></rss>`;
 }
 
-async function fetchFromRSSHub(path) {
+function placeholder(title) {
+  return buildRSS([], `${title} - 暂不可用`, 'https://example.com/', '抓取失败', '');
+}
+
+// ===== 源定义 =====
+const SOURCES = [
+  // RSSHub 优先，爬虫兜底
+  { id: 'huxiu',    label: '虎嗅',          url: 'https://www.huxiu.com/article',         domain: 'huxiu.com',         rsshub: '/huxiu/article' },
+  { id: 'lifeweek', label: '三联生活周刊',   url: 'https://www.lifeweek.com.cn/',          domain: 'lifeweek.com.cn',   rsshub: '/lifeweek',        puppeteer: true },
+  { id: 'ifeng',    label: '凤凰网资讯',     url: 'https://news.ifeng.com/',               domain: 'news.ifeng.com',    rsshub: '/ifeng/news' },
+  { id: 'infzm',    label: '南方周末',       url: 'https://www.infzm.com/contents',        domain: 'infzm.com',         rsshub: '/infzm',          puppeteer: true },
+  { id: 'thepaper', label: '澎湃新闻',       url: 'https://www.thepaper.cn/',              domain: 'thepaper.cn',       rsshub: '/thepaper',       puppeteer: true },
+  { id: 'wired',    label: 'Wired',         url: 'https://www.wired.com/',                domain: 'wired.com',         rsshub: '/wired' },
+  { id: 'jiemian',  label: '界面新闻',       url: 'https://www.jiemian.com/',              domain: 'jiemian.com',       rsshub: '/jiemian' },
+  { id: 'qqnews',   label: '腾讯新闻',       url: 'https://news.qq.com/',                  domain: 'news.qq.com',                                  puppeteer: true },
+].map(s => ({ ...s, filename: `${s.id}.xml` }));
+
+// ===== 抓取器 =====
+
+/** RSSHub 抓取 */
+async function rsshubFetch(path) {
   const url = `${RSSHUB_BASE}${path}`;
   const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
-  if (!res.ok) throw new Error(`RSSHub HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const body = await res.text();
-  if (!body.trim().startsWith('<?xml') && !body.trim().startsWith('<rss')) {
-    throw new Error('Response is not RSS XML');
-  }
+  if (!body.trim().startsWith('<?xml') && !body.trim().startsWith('<rss')) throw new Error('Not RSS');
   return body;
 }
 
-async function main() {
-  const dir = resolve(process.cwd(), OUTPUT_DIR);
-  mkdirSync(dir, { recursive: true });
+/** 简单 HTML 爬虫 */
+async function simpleScrape(url, domain) {
+  const res = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+      'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+    },
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const html = await res.text();
 
-  const results = [];
-
-  for (const source of SOURCES) {
-    process.stdout.write(`📡 [${source.label}] `);
-    let filePath = resolve(dir, `${source.id}.xml`);
-    let saved = false;
-
-    // 1) Try RSSHub
-    if (source.rsshub) {
-      try {
-        const xml = await fetchFromRSSHub(source.rsshub);
-        writeFileSync(filePath, xml, 'utf-8');
-        const size = (Buffer.byteLength(xml) / 1024).toFixed(1);
-        console.log(`✅ RSSHub → ${source.id}.xml (${size} KB)`);
-        results.push({ id: source.id, label: source.label, status: 'rsshub', size });
-        saved = true;
-      } catch (err) {
-        console.log(`⚠️ RSSHub 失败 (${err.message}), `);
-      }
-    }
-
-    // 2) Fallback: direct scraper
-    if (!saved && source.direct && directScrapers[source.direct]) {
-      try {
-        const items = await directScrapers[source.direct]();
-        if (items.length === 0) throw new Error('No items');
-        const xml = buildRSS(items, source.label, `https://${source.direct === 'ifeng' ? 'news.ifeng.com' : 'www.' + source.direct + '.com'}/`, `${source.label} - 由 GitHub Actions 抓取`);
-        writeFileSync(filePath, xml, 'utf-8');
-        const size = (Buffer.byteLength(xml) / 1024).toFixed(1);
-        console.log(`✅ 爬虫 → ${source.id}.xml (${size} KB, ${items.length}条)`);
-        results.push({ id: source.id, label: source.label, status: 'scraper', size });
-        saved = true;
-      } catch (err) {
-        console.log(`❌ 爬虫失败 (${err.message})`);
-      }
-    }
-
-    if (!saved) {
-      console.log(`❌ 全部失败`);
-      // Write placeholder
-      writeFileSync(filePath, `<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0"><channel><title>${source.label} - 抓取失败</title><link>https://example.com/</link><description>抓取失败</description></channel></rss>`, 'utf-8');
-      results.push({ id: source.id, label: source.label, status: 'failed', size: '0' });
+  const items = [];
+  const seen = new Set();
+  const escaped = domain.replace(/\./g, '\.');
+  const re = new RegExp(`<a[^>]*href="([^"]*${escaped}[^"]*)"[^>]*>([^<]{10,})</a>`, 'gi');
+  let m;
+  while ((m = re.exec(html)) !== null) {
+    let link = m[1];
+    const title = m[2].replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+    if (link.startsWith('//')) link = 'https:' + link;
+    if (!link.startsWith('http') || !title || title.length < 8 || seen.has(link)) continue;
+    seen.add(link);
+    items.push({ t: title, l: link.split('?')[0], p: new Date().toUTCString() });
+  }
+  if (items.length === 0) {
+    // Fallback: try <h2>/<h3> with link inside
+    const hRe = /<h[23][^>]*>.*?<a[^>]*href="([^"]+)"[^>]*>([^<]{10,})<\/a>.*?<\/h[23]>/gi;
+    while ((m = hRe.exec(html)) !== null) {
+      let link = m[1];
+      const title = m[2].replace(/<[^>]*>/g, '').trim();
+      if (link.startsWith('//')) link = 'https:' + link;
+      if (!link.startsWith('http') || !title || title.length < 8 || seen.has(link)) continue;
+      seen.add(link);
+      items.push({ t: title, l: link.split('?')[0], p: new Date().toUTCString() });
     }
   }
+  if (items.length === 0) throw new Error(`No items from ${domain}`);
+  return items.slice(0, 30);
+}
 
-  // Summary
-  console.log('\n═══════════════════════════════════');
-  for (const r of results) {
-    const icon = r.status === 'rsshub' ? '🐳' : r.status === 'scraper' ? '🕸️' : '❌';
-    console.log(`  ${icon} ${r.label}: ${r.status} (${r.size} KB)`);
+/** Puppeteer 渲染抓取（用于 SPA 页面） */
+async function puppeteerScrape(url, domain) {
+  const puppeteer = (await import('puppeteer')).default;
+  const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox','--disable-setuid-sandbox','--disable-dev-shm-usage'] });
+  try {
+    const page = await browser.newPage();
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/125.0.0.0 Safari/537.36');
+    await page.setViewport({ width: 1440, height: 900 });
+    await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+    await page.evaluate(() => new Promise(r => setTimeout(r, 2000)));
+
+    const items = await page.evaluate((dom) => {
+      const r = [], s = new Set();
+      for (const a of document.querySelectorAll('a')) {
+        const href = a.href || '';
+        const title = (a.textContent || a.innerText || '').trim();
+        if (!title || title.length < 8 || !href.includes(dom) || s.has(href)) continue;
+        s.add(href);
+        r.push({ t: title, l: href, p: new Date().toUTCString() });
+      }
+      return r;
+    }, domain);
+    return items.slice(0, 30);
+  } finally {
+    await browser.close().catch(() => {});
   }
 }
 
-main().catch((err) => { console.error('\n💥 异常:', err); process.exit(1); });
+// ===== 主流程 =====
+async function main() {
+  const dir = resolve(process.cwd(), OUT);
+  mkdirSync(dir, { recursive: true });
+  const results = [];
+
+  for (const src of SOURCES) {
+    process.stdout.write(`📡 ${src.label.padEnd(8)} `);
+    let xml = null;
+
+    // 1) RSSHub
+    if (src.rsshub) {
+      try {
+        xml = await rsshubFetch(src.rsshub);
+        const kb = (Buffer.byteLength(xml)/1024).toFixed(1);
+        process.stdout.write(`🐳RSSHub ${kb}KB `);
+      } catch (e) { process.stdout.write(`⚠️`); }
+    }
+
+    // 2) 简单爬虫
+    if (!xml) {
+      try {
+        const items = await simpleScrape(src.url, src.domain);
+        if (items.length > 0) {
+          xml = buildRSS(items, src.label, src.url, `${src.label} - 由 GitHub Actions 抓取`, src.filename);
+          const kb = (Buffer.byteLength(xml)/1024).toFixed(1);
+          process.stdout.write(`🕸️爬虫 ${kb}KB/${items.length}条 `);
+        }
+      } catch (e) { process.stdout.write(`🕸️✕`); }
+    }
+
+    // 3) Puppeteer（用于 SPA 站点）
+    if (!xml && src.puppeteer) {
+      try {
+        const items = await puppeteerScrape(src.url, src.domain);
+        if (items.length > 0) {
+          xml = buildRSS(items, src.label, src.url, `${src.label} - SPA 渲染抓取`, src.filename);
+          const kb = (Buffer.byteLength(xml)/1024).toFixed(1);
+          process.stdout.write(`🎭Puppeteer ${kb}KB/${items.length}条 `);
+        }
+      } catch (e) { process.stdout.write(`🎭✕`); }
+    }
+
+    if (xml) {
+      writeFileSync(resolve(dir, src.filename), xml, 'utf-8');
+      process.stdout.write(`✅\n`);
+      results.push({ id: src.id, label: src.label, ok: true });
+    } else {
+      writeFileSync(resolve(dir, src.filename), placeholder(src.label), 'utf-8');
+      process.stdout.write(`❌\n`);
+      results.push({ id: src.id, label: src.label, ok: false });
+    }
+  }
+
+  console.log(`\n═══════════════════════════════════`);
+  for (const r of results) {
+    console.log(`  ${r.ok ? '✅' : '❌'} ${r.label}`);
+  }
+}
+
+main().catch(e => { console.error('\n💥', e); process.exit(1); });

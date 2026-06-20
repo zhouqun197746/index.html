@@ -30,13 +30,13 @@ jobs:
           done
           echo "✅ RSSHub 已就绪"
 
-      - name: 📥 抓取 7 个源 + 腾讯新闻
+      - name: 📦 安装 Puppeteer（用于 SPA 渲染）
         run: |
-          mkdir -p rss
-          # 多源抓取（RSSHub → 自带爬虫 双路方案）
-          node scripts/fetch-sources.mjs
-          # Puppeteer 渲染腾讯新闻 SPA
-          node scripts/fetch-qqnews-rss.mjs
+          npm init -y > /dev/null 2>&1
+          npm install puppeteer
+
+      - name: 📥 多源并行抓取
+        run: node scripts/fetch-sources.mjs
 
       - name: 🧹 清理 Docker
         if: always()
@@ -53,6 +53,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "ℹ️ RSS 文件无变化，跳过提交"
           else
-            git commit -m "🤖 RSS 定时更新 $(date '+%Y-%m-%d %H:%M')"
+            git commit -m "🤖 RSS 定期更新 $(date '+%Y-%m-%d %H:%M')"
             git push
           fi
