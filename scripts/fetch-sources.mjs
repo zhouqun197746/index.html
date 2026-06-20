@@ -133,45 +133,20 @@ async function scrapeLifeweek() {
 }
 
 /** 澎湃新闻: URL 正则提取（简单可靠） */
-async function scrapeThepaper() {
-  const res = await fetch('https://www.thepaper.cn/', {
-    headers: {'User-Agent':'Mozilla/5.0 Chrome/125','Accept-Language':'zh-CN,zh;q=0.9'},
-    signal: AbortSignal.timeout(15000),
-  });
-  const html = await res.text();
-  const items = []; const seen = new Set();
 
-  // URL 正则提取
-  const urls = new Set(html.match(/newsDetail_forward_\d+/g) || []);
-  for (const u of urls) {
-    if (!seen.has(u)) {
-      seen.add(u);
-      items.push({t:'澎湃新闻', l:'https://www.thepaper.cn/' + u, p: new Date().toUTCString()});
-    }
-  }
-
-  // 从页面提取标题（如果有）
-  const titles = [...html.matchAll(/"name"\s*:\s*"([^"]{8,})"/g)];
-  for (let i = 0; i < Math.min(titles.length, items.length); i++) {
-    items[i].t = titles[i][1].replace(/[\uD800-\uDFFF]/g,'');
-  }
-
-  if (!items.length) throw new Error('No items from thepaper');
-  return items.slice(0, 30);
-}
 
 const SOURCES = [
   // 原来源
   {id:'huxiu',   label:'虎嗅',        url:'https://www.huxiu.com/article',    domain:'huxiu.com',     rsshub:'/huxiu/article'},
-  {id:'lifeweek',label:'三联生活周刊', url:'https://www.lifeweek.com.cn/',     domain:'lifeweek.com.cn', fn:'scrapeLifeweek'},
+  {id:'lifeweek',label:'三联生活周刊', url:'https://www.lifeweek.com.cn/',     domain:'lifeweek.com.cn', puppeteer:true  },
   {id:'ifeng',   label:'凤凰网资讯',   url:'https://news.ifeng.com/',          domain:'news.ifeng.com', rsshub:'/ifeng/news'},
   {id:'infzm',   label:'南方周末',     url:'https://www.infzm.com/',           domain:'infzm.com',     puppeteer:true},
-  {id:'thepaper',label:'澎湃新闻',     url:'https://www.thepaper.cn/',          domain:'thepaper.cn',   fn:'scrapeThepaper'},
+  {id:'thepaper',label:'澎湃新闻',     url:'https://www.thepaper.cn/',          domain:'thepaper.cn',   puppeteer:true  },
   {id:'jiemian', label:'界面新闻',     url:'https://www.jiemian.com/',          domain:'jiemian.com',   rsshub:'/jiemian'},
   {id:'qqnews',  label:'腾讯新闻',     url:'https://news.qq.com/',              domain:'news.qq.com',   puppeteer:true},
 
   // 新增源 (RSSHub已知路由)
-  {id:'medium',  label:'Medium',      url:'https://medium.com/',               domain:'medium.com'},
+  {id:'medium',  label:'Medium',      url:'https://medium.com/',               domain:'medium.com',    puppeteer:true},
   {id:'bilibili',label:'B站热门',      url:'https://www.bilibili.com/',         domain:'bilibili.com',  rsshub:'/bilibili/popular'},
   {id:'douyin',  label:'抖音热点',     url:'https://www.douyin.com/',           domain:'douyin.com',    puppeteer:true},
   {id:'youtube', label:'YouTube热榜',  url:'https://www.youtube.com/feed/trending', domain:'youtube.com', rsshub:'/youtube/trending'},
@@ -196,7 +171,6 @@ async function main() {
 
     // Named function scraper
     if (!xml && src.fn) {
-      const fnMap = { scrapeThepaper, scrapeLifeweek };
       if (fnMap[src.fn]) {
         try { const items = await fnMap[src.fn](); if (items.length>0) { xml = buildRSS(items, src.label, src.url, src.label, fn); const kb=(Buffer.byteLength(xml)/1024).toFixed(1); process.stdout.write('S' + kb + 'KB/' + items.length + '条 '); } }
         catch{ process.stdout.write('Sx '); }
