@@ -7,59 +7,112 @@
 <style>
   body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;max-width:720px;margin:40px auto;padding:0 20px;color:#333;line-height:1.6}
   h1{border-bottom:2px solid #e8f0fe;padding-bottom:12px}
-  h2{color:#555;margin-top:32px}
   ul{padding:0;list-style:none}
-  li{margin:12px 0;padding:16px;background:#f8f9fa;border-radius:8px;border:1px solid #e0e0e0}
+  li{margin:10px 0;padding:14px 16px;background:#f8f9fa;border-radius:8px;border:1px solid #e0e0e0;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap}
   li:hover{background:#e8f0fe;border-color:#1a73e8}
-  a{color:#1a73e8;text-decoration:none;font-size:17px;font-weight:500}
-  a:hover{text-decoration:underline}
-  .desc{font-size:13px;color:#666;margin-top:4px}
-  .badge{display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;margin-left:8px;color:#fff}
-  .badge-rss{background:#e74c3c}
-  .badge-ok{background:#27ae60;font-weight:bold}
-  .badge-warn{background:#f39c12}
-  .status{font-size:12px;margin-top:4px;color:#888}
-  footer{margin-top:40px;font-size:12px;color:#999;border-top:1px solid #eee;padding-top:12px}
+  .src{color:#1a73e8;text-decoration:none;font-size:16px;font-weight:500}
+  .src:hover{text-decoration:underline}
+  .badge{display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;margin-left:6px;font-weight:bold}
+  .badge-rss{background:#e74c3c;color:#fff}
+  .badge-docker{background:#2496ed;color:#fff}
+  .badge-puppeteer{background:#43a047;color:#fff}
+  .badge-scraper{background:#f39c12;color:#fff}
+  .desc{font-size:12px;color:#666;width:100%;margin-top:4px}
+  .right{font-size:11px;color:#888;white-space:nowrap}
+  footer{margin-top:32px;font-size:12px;color:#999;border-top:1px solid #eee;padding-top:12px}
   pre{background:#f4f4f4;padding:12px;border-radius:6px;font-size:13px;overflow-x:auto}
+  .back{font-size:14px;margin-bottom:16px}
+  .back a{color:#666;text-decoration:none}
+  .back a:hover{text-decoration:underline}
 </style>
 </head>
 <body>
-<div style="margin-bottom:20px"><a href="/" style="color:#666;font-size:14px">← 返回主页</a></div>
+<div class="back"><a href="/">← 返回主页</a></div>
 <h1>📡 RSS 订阅源</h1>
-<p>由 GitHub Actions 定时抓取，每 2 小时自动更新。</p>
+<p>由 GitHub Actions 每 2 小时自动抓取更新。</p>
 
-<h2>✅ 正常运行</h2>
 <ul>
   <li>
-    <span class="badge badge-ok">✓</span>
-    <a href="36kr.xml">36氪 · 最新资讯 <span class="badge badge-rss">RSS</span></a>
-    <div class="desc">36氪快讯，涵盖科技、创投、商业等领域</div>
-    <div class="status">数据来源: RSSHub + 36kr.com</div>
+    <div>
+      <span class="src">虎嗅</span><span class="badge badge-rss">RSS</span>
+      <span class="badge badge-scraper">爬虫</span>
+      <div class="desc">huxiu.com 精选深度商业文章</div>
+    </div>
+    <div class="right"><a href="huxiu.xml">huxiu.xml</a></div>
   </li>
   <li>
-    <span class="badge badge-ok">✓</span>
-    <a href="hackernews.xml">Hacker News <span class="badge badge-rss">RSS</span></a>
-    <div class="desc">Hacker News 最新热门讨论</div>
-    <div class="status">数据来源: RSSHub + news.ycombinator.com</div>
+    <div>
+      <span class="src">三联生活周刊</span><span class="badge badge-rss">RSS</span>
+      <span class="badge badge-scraper">爬虫</span>
+      <div class="desc">lifeweek.com.cn 文化·生活·深度报道</div>
+    </div>
+    <div class="right"><a href="lifeweek.xml">lifeweek.xml</a></div>
   </li>
   <li>
-    <span class="badge badge-warn">⚠</span>
-    <a href="qqnews.xml">腾讯新闻 · 首页信息流 <span class="badge badge-rss">RSS</span></a>
-    <div class="desc">news.qq.com 首页新闻（直接爬取，非 RSSHub 路由）</div>
-    <div class="status">数据来源: 直接爬取 news.qq.com</div>
+    <div>
+      <span class="src">凤凰网资讯</span><span class="badge badge-rss">RSS</span>
+      <span class="badge badge-scraper">爬虫</span>
+      <div class="desc">news.ifeng.com 综合新闻资讯</div>
+    </div>
+    <div class="right"><a href="ifeng.xml">ifeng.xml</a></div>
+  </li>
+  <li>
+    <div>
+      <span class="src">南方周末</span><span class="badge badge-rss">RSS</span>
+      <span class="badge badge-scraper">爬虫</span>
+      <div class="desc">infzm.com 深度新闻·人文·思想</div>
+    </div>
+    <div class="right"><a href="infzm.xml">infzm.xml</a></div>
+  </li>
+  <li>
+    <div>
+      <span class="src">澎湃新闻</span><span class="badge badge-rss">RSS</span>
+      <span class="badge badge-scraper">爬虫</span>
+      <div class="desc">thepaper.cn 时事·思想·政论</div>
+    </div>
+    <div class="right"><a href="thepaper.xml">thepaper.xml</a></div>
+  </li>
+  <li>
+    <div>
+      <span class="src">Wired</span><span class="badge badge-rss">RSS</span>
+      <span class="badge badge-scraper">爬虫</span>
+      <div class="desc">wired.com 科技·文化·未来趋势（英文）</div>
+    </div>
+    <div class="right"><a href="wired.xml">wired.xml</a></div>
+  </li>
+  <li>
+    <div>
+      <span class="src">界面新闻</span><span class="badge badge-rss">RSS</span>
+      <span class="badge badge-scraper">爬虫</span>
+      <div class="desc">jiemian.com 财经·商业·科技快讯</div>
+    </div>
+    <div class="right"><a href="jiemian.xml">jiemian.xml</a></div>
+  </li>
+  <li>
+    <div>
+      <span class="src">腾讯新闻</span><span class="badge badge-rss">RSS</span>
+      <span class="badge badge-puppeteer">Puppeteer</span>
+      <div class="desc">news.qq.com 首页全品类新闻（SPA 渲染）</div>
+    </div>
+    <div class="right"><a href="qqnews.xml">qqnews.xml</a></div>
   </li>
 </ul>
 
-<h2>🔗 订阅链接</h2>
+<h2>🔗 全部订阅链接</h2>
 <pre>
-https://zhouqun197746.github.io/index.html/rss/36kr.xml
-https://zhouqun197746.github.io/index.html/rss/hackernews.xml
+https://zhouqun197746.github.io/index.html/rss/huxiu.xml
+https://zhouqun197746.github.io/index.html/rss/lifeweek.xml
+https://zhouqun197746.github.io/index.html/rss/ifeng.xml
+https://zhouqun197746.github.io/index.html/rss/infzm.xml
+https://zhouqun197746.github.io/index.html/rss/thepaper.xml
+https://zhouqun197746.github.io/index.html/rss/wired.xml
+https://zhouqun197746.github.io/index.html/rss/jiemian.xml
 https://zhouqun197746.github.io/index.html/rss/qqnews.xml
 </pre>
 
-<p>在 RSS 阅读器中添加以上链接即可订阅。</p>
+<p>📥 在 RSS 阅读器中添加上述链接即可订阅。</p>
 <footer>
-  Powered by <a href="https://github.com/DIYgod/RSSHub">RSSHub</a> + 自研爬虫 ·
+  数据来源：<a href="https://github.com/DIYgod/RSSHub">RSSHub</a> + 自研爬虫 + Puppeteer ·
   <a href="https://github.com/zhouqun197746/index.html/actions/workflows/qqnews-rss.yml">查看运行状态</a>
 </footer>
 </body>
