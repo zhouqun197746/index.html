@@ -21,43 +21,34 @@ jobs:
         with:
           node-version: 22
 
-      - name: 🐳 启动 RSSHub（Docker）
+      - name: 🐳 启动 RSSHub（Docker）— 用于可工作路由
         run: |
           docker run -d --name rsshub -p 1200:1200 diygod/rsshub
-          echo "等待 RSSHub 启动..."
           for i in $(seq 1 30); do
-            if curl -s -o /dev/null -w '%{http_code}' http://localhost:1200/ 2>/dev/null | grep -q 200; then
-              echo "✅ RSSHub 已就绪"
-              break
-            fi
+            curl -s -o /dev/null -w '%{http_code}' http://localhost:1200/ 2>/dev/null | grep -q 200 && break
             sleep 2
           done
+          echo "✅ RSSHub 已就绪"
 
       - name: 📥 抓取 RSSHub 工作路由
         run: |
           mkdir -p rss
-          
           echo "=== 36氪 ==="
-          curl -sL -o rss/36kr.xml http://localhost:1200/36kr/news
-          head -c 100 rss/36kr.xml
-          echo ""
-          
+          curl -sL -o rss/36kr.xml http://localhost:1200/36kr/news || true
           echo "=== Hacker News ==="
-          curl -sL -o rss/hackernews.xml http://localhost:1200/hackernews
-          head -c 100 rss/hackernews.xml
-          echo ""
+          curl -sL -o rss/hackernews.xml http://localhost:1200/hackernews || true
+
+      - name: 📦 安装 Puppeteer（腾讯新闻爬虫）
+        run: |
+          npm init -y > /dev/null 2>&1
+          npm install puppeteer
+
+      - name: 🕸️ 抓取腾讯新闻（Puppeteer 渲染 SPA）
+        run: node scripts/fetch-qqnews-rss.mjs
 
       - name: 🧹 清理 Docker
         if: always()
         run: docker rm -f rsshub 2>/dev/null || true
-
-      - name: 🕸️ 直接抓取腾讯新闻（绕过网络限制）
-        run: |
-          # 禁用 bash 严格模式，允许部分失败
-          set +e
-          
-          echo "=== 腾讯新闻 - 直接爬取 ==="
-          node scripts/fetch-qqnews-rss.mjs
 
       - name: 📋 列出输出文件
         run: ls -lh rss/

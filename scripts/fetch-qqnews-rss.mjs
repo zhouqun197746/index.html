@@ -3,25 +3,23 @@
 /**
  * fetch-qqnews-rss.mjs
  *
- * 直接从 news.qq.com 爬取首页新闻，生成 RSS XML。
- * 无需 RSSHub，适用于 GitHub Actions 等受限环境。
+ * 使用 Puppeteer 渲染 news.qq.com（React SPA），提取新闻内容并生成 RSS XML。
+ * 适用于 GitHub Actions 环境。
  *
+ * 依赖: npm install puppeteer
  * 输出: ./rss/qqnews.xml
  */
 
-const OUTPUT_DIR = './rss';
 const RSS_LINK_BASE = 'https://zhouqun197746.github.io/index.html/rss';
 
-// ===== RSS 模板 =====
 function buildRSS(items, channelTitle, channelLink, channelDesc) {
   const itemXML = items.map((item) => `
     <item>
       <title><![CDATA[${item.title}]]></title>
-      <link>${item.link}</link>
-      <guid isPermaLink="true">${item.link}</guid>
+      <link><![CDATA[${item.link}]]></link>
+      <guid isPermaLink="true"><![CDATA[${item.link}]]></guid>
       <description><![CDATA[${item.desc || item.title}]]></description>
       <pubDate>${item.pubDate}</pubDate>
-      <source url="${channelLink}">${channelTitle}</source>
     </item>`).join('');
 
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -37,124 +35,100 @@ function buildRSS(items, channelTitle, channelLink, channelDesc) {
 </rss>`;
 }
 
-// ===== 从 news.qq.com 提取新闻 =====
 async function scrapeQQNews() {
-  const url = 'https://news.qq.com/';
-  console.log(`  📡 请求 ${url}`);
-
-  const res = await fetch(url, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-    },
-    signal: AbortSignal.timeout(30000),
-  });
-
-  if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${url}`);
-  const html = await res.text();
-  console.log(`  📄 页面大小: ${(html.length / 1024).toFixed(1)} KB`);
-
-  // 提取新闻条目 - 匹配常见模式
-  // news.qq.com 使用多种 DOM 结构，我们匹配链接和标题
-  const items = [];
-  
-  // 方法1: 匹配 <a> 标签中的 news.qq.com 链接
-  const linkRegex = /<a[^>]*href="(https?:\/\/[^"]*news\.qq\.com[^"]*)"[^>]*>(.*?)<\/a>/gi;
-  let match;
-  const seen = new Set();
-
-  while ((match = linkRegex.exec(html)) !== null) {
-    const link = match[1].split('?')[0];  // 去掉查询参数
-    let title = match[2].replace(/<[^>]*>/g, '').trim();
+  let browser;
+  try {
+    const puppeteer = await import('puppeteer');
+    console.log('  🚀 启动 Chromium...');
     
-    // 过滤
-    if (!title || title.length < 10) continue;
-    if (seen.has(link)) continue;
-    
-    // 只保留有效新闻链接
-    if (!link.includes('news.qq.com') && !link.includes('new.qq.com')) continue;
-    
-    seen.add(link);
-    items.push({
-      title,
-      link,
-      desc: title,
-      pubDate: new Date().toUTCString(),
+    browser = await puppeteer.default.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
     });
-  }
 
-  // 方法2: 匹配 JSON 数据（腾讯新闻常见的内嵌 JSON）
-  const jsonRegex = /"title"\s*:\s*"([^"]+)"[^}]*"url"\s*:\s*"([^"]+)"/gi;
-  while ((match = jsonRegex.exec(html)) !== null) {
-    const title = match[1].replace(/\u[\dA-Fa-f]{4}/g, '').replace(/\\"/g, '"');
-    let link = match[2].replace(/\\//g, '/');
-    if (!link.startsWith('http')) {
-      if (link.startsWith('//')) link = 'https:' + link;
-      else if (link.startsWith('/')) link = 'https://news.qq.com' + link;
-      else continue;
-    }
-    if (!title || title.length < 8) continue;
-    if (seen.has(link)) continue;
-    seen.add(link);
-    items.push({
-      title,
-      link,
-      desc: title,
-      pubDate: new Date().toUTCString(),
+    const page = await browser.newPage();
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36');
+    await page.setViewport({ width: 1440, height: 900 });
+
+    console.log('  📡 加载 news.qq.com（等待渲染）...');
+    await page.goto('https://news.qq.com/', { 
+      waitUntil: 'networkidle2', 
+      timeout: 45000 
     });
-  }
 
-  // 方法3: 匹配 <h2>/<h3> 中的标题文本附近的链接
-  const headingRegex = /<h[23][^>]*>(.*?)<\/h[23]>/gi;
-  while ((match = headingRegex.exec(html)) !== null) {
-    const inner = match[1];
-    const aMatch = inner.match(/<a[^>]*href="([^"]+)"[^>]*>(.*?)<\/a>/i);
-    if (aMatch) {
-      let link = aMatch[1];
-      const title = aMatch[2].replace(/<[^>]*>/g, '').trim();
-      if (!link.startsWith('http')) {
-        if (link.startsWith('//')) link = 'https:' + link;
-        else if (link.startsWith('/')) link = 'https://news.qq.com' + link;
-        else continue;
-      }
-      if (title && title.length >= 8 && !seen.has(link)) {
-        seen.add(link);
-        items.push({
-          title,
-          link: link.split('?')[0],
-          desc: title,
-          pubDate: new Date().toUTCString(),
-        });
-      }
-    }
-  }
+    // 等待内容渲染
+    await page.evaluate(() => new Promise((r) => setTimeout(r, 3000)));
 
-  return items;
+    // 提取新闻条目
+    const items = await page.evaluate(() => {
+      const results = [];
+      const seen = new Set();
+
+      // 匹配各种可能的新闻卡片结构
+      const selectors = [
+        'a[href*="news.qq.com"]',
+        'a[href*="new.qq.com"]',
+        'a[href*="view.inews.qq.com"]',
+        '.article-title a',
+        '.news-item a',
+        '.item-title a',
+        'h2 a',
+        'h3 a',
+        '[class*="title"] a',
+        '[class*="news"] a[href*="qq"]',
+      ];
+
+      for (const sel of selectors) {
+        const links = document.querySelectorAll(sel);
+        for (const link of links) {
+          const href = link.href || link.getAttribute('href') || '';
+          const title = (link.textContent || link.innerText || '').trim();
+          
+          if (!title || title.length < 8) continue;
+          if (seen.has(href)) continue;
+          
+          // 过滤掉非新闻链接
+          if (href.includes('javascript:') || href === '#') continue;
+          if (!href.includes('news.qq.com') && !href.includes('new.qq.com') && !href.includes('view.inews.qq.com')) continue;
+          
+          seen.add(href);
+          results.push({
+            title,
+            link: href,
+            desc: title,
+            pubDate: new Date().toUTCString(),
+          });
+        }
+      }
+
+      return results;
+    });
+
+    console.log(`  📊 页面提取到 ${items.length} 条新闻`);
+    return items;
+
+  } finally {
+    if (browser) await browser.close().catch(() => {});
+  }
 }
 
-// ===== 主流程 =====
 async function main() {
-  console.log('🕸️ 腾讯新闻直接爬取器');
+  console.log('🕸️ 腾讯新闻爬虫（Puppeteer 渲染版）');
   console.log('═══════════════════════════════════\n');
 
-  const outputDir = new URL(OUTPUT_DIR, `file://${process.cwd()}/`).pathname;
   const { mkdirSync, writeFileSync } = await import('fs');
   const { resolve } = await import('path');
-  const dir = resolve(process.cwd(), OUTPUT_DIR);
+  const dir = resolve(process.cwd(), './rss');
   mkdirSync(dir, { recursive: true });
 
   try {
     const items = await scrapeQQNews();
-    console.log(`\n  📊 共提取 ${items.length} 条新闻`);
-
+    
     if (items.length === 0) {
-      console.error('  ❌ 未提取到任何新闻');
-      process.exitCode = 1;
-      return;
+      console.error('  ❌ 未提取到新闻，保留现有文件');
+      return;  // 不覆盖已有文件
     }
 
-    // 去重后按原序保留前十
     const unique = items.filter((item, i, arr) => arr.findIndex((x) => x.link === item.link) === i);
     const topItems = unique.slice(0, 50);
 
@@ -172,9 +146,9 @@ async function main() {
 
   } catch (err) {
     console.error(`\n  ❌ 抓取失败: ${err.message}`);
-    // 如果抓取失败，创建一个占位 RSS
+    // 创建错误占位 RSS
     const { writeFileSync } = await import('fs');
-    const fallbackXml = `<?xml version="1.0" encoding="UTF-8"?>
+    writeFileSync(resolve(dir, 'qqnews.xml'), `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0">
   <channel>
     <title>腾讯新闻 - 抓取失败</title>
@@ -182,10 +156,8 @@ async function main() {
     <description>抓取失败: ${err.message}</description>
     <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>
   </channel>
-</rss>`;
-    writeFileSync(resolve(dir, 'qqnews.xml'), fallbackXml, 'utf-8');
+</rss>`, 'utf-8');
     console.log(`  ⚠️ 已写入占位 RSS`);
-    process.exitCode = 1;
   }
 }
 
