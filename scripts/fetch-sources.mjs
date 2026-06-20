@@ -84,7 +84,30 @@ async function puppeteerScrape(url, domain) {
   } finally { await b.close().catch(()=>{}); }
 }
 
-/** thepaper.cn specific: extract from __NEXT_DATA__ or fallback to URL regex */
+/** 三联生活周刊: Puppeteer 渲染提取（避免 CSS 字体链接污染） */
+async function scrapeLifeweek() {
+  const pp = (await import('puppeteer')).default;
+  const b = await pp.launch({headless:true, args:['--no-sandbox','--disable-setuid-sandbox','--disable-dev-shm-usage']});
+  try {
+    const pg = await b.newPage();
+    await pg.setUserAgent('Mozilla/5.0 Chrome/125');
+    await pg.setViewport({width:1440,height:900});
+    await pg.goto('https://www.lifeweek.com.cn/', {waitUntil:'networkidle2',timeout:25000});
+    await pg.evaluate(() => new Promise(r => setTimeout(r,3000)));
+    const items = await pg.evaluate(() => {
+      const r=[],s=new Set();
+      for (const a of document.querySelectorAll('a[href*="lifeweek.com.cn/article/"], a[href*="lifeweek.com.cn/detail/"]')) {
+        const t=(a.textContent||a.innerText||'').replace(/\s+/g,' ').trim();
+        if (t.length>5 && a.href && !s.has(a.href)) { s.add(a.href); r.push({t,l:a.href.split('?')[0],p:new Date().toUTCString()}); }
+      }
+      return r;
+    });
+    if (!items.length) throw new Error('No article links found');
+    return items.slice(0,30);
+  } finally { await b.close().catch(()=>{}); }
+}
+
+/** 澎湃新闻: 正则提取 newsDetail_forward_ / Puppeteer 兜底 */
 async function scrapeThepaper() {
   const res = await fetch('https://www.thepaper.cn/', {
     headers: {'User-Agent':'Mozilla/5.0 Chrome/125','Accept-Language':'zh-CN,zh;q=0.9'},
@@ -93,7 +116,7 @@ async function scrapeThepaper() {
   const html = await res.text();
   const items = []; const seen = new Set();
 
-  // Method 1: __NEXT_DATA__ (positional, no regex truncation)
+  // __NEXT_DATA__ positional extract
   const ndx = html.indexOf('__NEXT_DATA__');
   if (ndx >= 0) {
     const s = html.indexOf('>', ndx) + 1;
@@ -103,23 +126,25 @@ async function scrapeThepaper() {
         const data = JSON.parse(html.slice(s, e));
         const pd = data.props.pageProps.data || {};
         for (const k of Object.keys(pd)) {
-          if (Array.isArray(pd[k])) {
-            for (const item of pd[k]) {
+          const arr = pd[k];
+          if (Array.isArray(arr)) {
+            for (const item of arr) {
               const t = item.name || item.title || '';
               const id = item.contId || item.id || '';
               const l = id ? 'https://www.thepaper.cn/newsDetail_forward_' + id : '';
               if (t && l && t.length > 5 && !seen.has(l)) {
-                seen.add(l); items.push({t: t.replace(/[\uD800-\uDFFF]/g,''), l, p: new Date().toUTCString()});
+                seen.add(l);
+                items.push({t: t.replace(/[\uD800-\uDFFF]/g,'').trim(), l, p: new Date().toUTCString()});
               }
             }
           }
         }
-      } catch(e) { process.stdout.write('[thepaper:'+e.message+']'); }
+      } catch {}
     }
   }
 
-  // Method 2: URL regex fallback
-  if (items.length === 0) {
+  // URL regex fallback
+  if (!items.length) {
     const urls = new Set(html.match(/newsDetail_forward_\d+/g) || []);
     for (const u of urls) {
       items.push({t:'澎湃新闻', l:'https://www.thepaper.cn/' + u, p: new Date().toUTCString()});
@@ -130,61 +155,22 @@ async function scrapeThepaper() {
   return items.slice(0, 30);
 }
 
-/** lifeweek specific: Nuxt.js embedded data + Puppeteer fallback */
-async function scrapeLifeweek() {
-  const res = await fetch('https://www.lifeweek.com.cn/', {
-    headers: {'User-Agent':'Mozilla/5.0 Chrome/125','Accept-Language':'zh-CN,zh;q=0.9'},
-    signal: AbortSignal.timeout(15000),
-  });
-  const html = await res.text();
-  const items = []; const seen = new Set();
-
-  const urls = new Set(html.match(/https?:\/\/[^"']*lifeweek[^"']*(?:article|detail|content|story)[^"']*/g) || []);
-  const titles = [...html.matchAll(/"title"\s*:\s*"([^"]{8,})"/g)];
-  let ti = 0;
-  for (const u of urls) {
-    const t = titles[ti]?.[1] || '三联生活周刊';
-    items.push({t, l: u, p: new Date().toUTCString()});
-    ti++;
-  }
-
-  if (items.length < 3) {
-    try {
-      const pp = (await import('puppeteer')).default;
-      const b = await pp.launch({headless:true, args:['--no-sandbox','--disable-setuid-sandbox','--disable-dev-shm-usage']});
-      try {
-        const pg = await b.newPage();
-        await pg.setUserAgent('Mozilla/5.0 Chrome/125');
-        await pg.setViewport({width:1440,height:900});
-        await pg.goto('https://www.lifeweek.com.cn/', {waitUntil:'networkidle2',timeout:25000});
-        await pg.evaluate(() => new Promise(r => setTimeout(r,3000)));
-        const pi = await pg.evaluate(() => {
-          const r=[],s=new Set();
-          for (const a of document.querySelectorAll('a[href*="lifeweek"]')) {
-            const t=(a.textContent||'').trim();
-            if (t.length>5 && a.href && !s.has(a.href)) { s.add(a.href); r.push({t,l:a.href,p:new Date().toUTCString()}); }
-          }
-          return r;
-        });
-        items.push(...pi);
-      } finally { await b.close().catch(()=>{}); }
-    } catch {}
-  }
-
-  if (!items.length) throw new Error('No items from lifeweek');
-  const unique = items.filter((x,i,a) => a.findIndex(y => y.l === x.l) === i);
-  return unique.slice(0, 30);
-}
-
 const SOURCES = [
+  // 原来源
   {id:'huxiu',   label:'虎嗅',        url:'https://www.huxiu.com/article',    domain:'huxiu.com',     rsshub:'/huxiu/article'},
   {id:'lifeweek',label:'三联生活周刊', url:'https://www.lifeweek.com.cn/',     domain:'lifeweek.com.cn', fn:'scrapeLifeweek'},
   {id:'ifeng',   label:'凤凰网资讯',   url:'https://news.ifeng.com/',          domain:'news.ifeng.com', rsshub:'/ifeng/news'},
-  {id:'infzm',   label:'南方周末',     url:'https://www.infzm.com/',   domain:'infzm.com',     puppeteer:true},
-  {id:'thepaper',label:'澎湃新闻',     url:'https://www.thepaper.cn/',          domain:'thepaper.cn',   puppeteer:true   },
-  {id:'wired',   label:'Wired',       url:'https://www.wired.com/',            domain:'wired.com',     rsshub:'/wired'},
+  {id:'infzm',   label:'南方周末',     url:'https://www.infzm.com/',           domain:'infzm.com',     puppeteer:true},
+  {id:'thepaper',label:'澎湃新闻',     url:'https://www.thepaper.cn/',          domain:'thepaper.cn',   fn:'scrapeThepaper'},
   {id:'jiemian', label:'界面新闻',     url:'https://www.jiemian.com/',          domain:'jiemian.com',   rsshub:'/jiemian'},
   {id:'qqnews',  label:'腾讯新闻',     url:'https://news.qq.com/',              domain:'news.qq.com',   puppeteer:true},
+
+  // 新增源
+  {id:'medium',  label:'Medium',      url:'https://medium.com/',               domain:'medium.com',    rsshub:'/medium'},
+  {id:'bilibili',label:'B站热门',      url:'https://www.bilibili.com/',         domain:'bilibili.com',  rsshub:'/bilibili/popular'},
+  {id:'douyin',  label:'抖音热点',     url:'https://www.douyin.com/',           domain:'douyin.com',    puppeteer:true},
+  {id:'youtube', label:'YouTube热榜',  url:'https://www.youtube.com/feed/trending', domain:'youtube.com', rsshub:'/youtube/trending'},
+  {id:'xiaohongshu',label:'小红书热门',url:'https://www.xiaohongshu.com/',       domain:'xiaohongshu.com', puppeteer:true},
 ];
 
 async function main() {
