@@ -2,7 +2,7 @@ name: 📰 RSS 聚合抓取
 
 on:
   schedule:
-    - cron: '0 */2 * * *'
+    - cron: '0 0,12 * * *'
   workflow_dispatch:
 
 permissions:
