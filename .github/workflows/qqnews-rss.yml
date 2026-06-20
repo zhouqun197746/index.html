@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write   # 允许 push RSS 文件回仓库
+  contents: write
 
 jobs:
   fetch-rss:
@@ -34,35 +34,29 @@ jobs:
           curl -s -o /dev/null -w 'HTTP %{http_code}, Size: %{size_download}\n' http://localhost:1200/
           
           echo "=== 探测腾讯新闻路由 ==="
-          for path in \
-            /tencent/news \
-            /tencent \
-            /qq/news \
-            /new/qnews \
-            /tengxun \
-            /tengxunxinwen \
-            /news/qq \
-            /news/tencent; do
+          for path in /tencent/news /tencent /tengxun /news/qq /news/tencent; do
             code=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:1200${path}" 2>/dev/null)
-            size=$(curl -s -o "$(mktemp)" "http://localhost:1200${path}" 2>/dev/null && wc -c < "$_")
-            echo "  $path → HTTP $code, ${size}bytes"
+            outfile=$(mktemp)
+            curl -s -o "$outfile" "http://localhost:1200${path}"
+            size=$(wc -c < "$outfile")
+            echo "  ${path} → HTTP ${code}, ${size}bytes"
+            rm -f "$outfile"
           done
 
-      - name: 📥 抓取 RSS
+      - name: 📥 抓取腾讯新闻 RSS
         run: |
           mkdir -p rss
           
-          # 使用正确的路由路径
           echo "=== 腾讯新闻-首页信息流 ==="
           curl -sL -o rss/qqnews.xml http://localhost:1200/tencent/news
-          echo "文件大小: $(wc -c < rss/qqnews.xml) bytes, 开头:"
-          head -c 200 rss/qqnews.xml
+          echo "文件大小: $(wc -c < rss/qqnews.xml) bytes"
+          head -c 300 rss/qqnews.xml
           echo ""
           
           echo "=== 腾讯新闻-综合热榜 ==="
           curl -sL -o rss/qqnews-rank.xml http://localhost:1200/tencent/news/rank
-          echo "文件大小: $(wc -c < rss/qqnews-rank.xml) bytes, 开头:"
-          head -c 200 rss/qqnews-rank.xml
+          echo "文件大小: $(wc -c < rss/qqnews-rank.xml) bytes"
+          head -c 300 rss/qqnews-rank.xml
           echo ""
 
       - name: 📋 列出输出文件
