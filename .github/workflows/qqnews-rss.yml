@@ -28,35 +28,58 @@ jobs:
             sleep 2
           done
 
-      - name: 🔍 探测可用路由
+      - name: 🔍 探测所有腾讯系路由
         run: |
-          echo "=== 根路由 ==="
-          curl -s -o /dev/null -w 'HTTP %{http_code}, Size: %{size_download}\n' http://localhost:1200/
+          echo "=== RSSHub 首页（查看可用路由）==="
+          curl -s http://localhost:1200/ | grep -oP 'href="[^"]*tencent[^"]*"' | head -20
+          curl -s http://localhost:1200/ | grep -oP 'href="[^"]*qq[^"]*"' | head -20
           
-          echo "=== 探测腾讯新闻路由 ==="
-          for path in /tencent/news /tencent /tengxun /news/qq /news/tencent; do
+          echo ""
+          echo "=== 探测已知路由 ==="
+          for path in \
+            /tencent/news \
+            /tencent/news/rank \
+            /tencent/news/rank?type=hotSpot \
+            /tencent/news/rank?type=news \
+            /tencent/fresh \
+            /tencent/txsj \
+            /tencent/qq/sogou \
+            /tencent/game \
+            /tencent/video \
+            /tencent/video/playlist \
+            /tencent/shenma; do
             code=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:1200${path}" 2>/dev/null)
-            outfile=$(mktemp)
-            curl -s -o "$outfile" "http://localhost:1200${path}"
-            size=$(wc -c < "$outfile")
-            echo "  ${path} → HTTP ${code}, ${size}bytes"
-            rm -f "$outfile"
+            echo "  ${path} → HTTP ${code}"
+          done
+          
+          echo ""
+          echo "=== 探测常规路由（验证 RSSHub 是否能正常生成 RSS）==="
+          for path in \
+            /github/trending/daily \
+            /github/topics \
+            /v2ex/topics \
+            /zhihu/hotlist \
+            /weibo/hot \
+            /bilibili/hot \
+            /36kr/news \
+            /hackernews; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:1200${path}" 2>/dev/null)
+            echo "  ${path} → HTTP ${code}"
           done
 
-      - name: 📥 抓取腾讯新闻 RSS
+      - name: 📥 抓取工作路由
         run: |
           mkdir -p rss
           
-          echo "=== 腾讯新闻-首页信息流 ==="
-          curl -sL -o rss/qqnews.xml http://localhost:1200/tencent/news
-          echo "文件大小: $(wc -c < rss/qqnews.xml) bytes"
-          head -c 300 rss/qqnews.xml
+          # 先试试几个有把握的路由
+          echo "=== GitHub Trending ==="
+          curl -sL -o rss/github-trending.xml http://localhost:1200/github/trending/daily
+          head -3 rss/github-trending.xml
           echo ""
           
-          echo "=== 腾讯新闻-综合热榜 ==="
-          curl -sL -o rss/qqnews-rank.xml http://localhost:1200/tencent/news/rank
-          echo "文件大小: $(wc -c < rss/qqnews-rank.xml) bytes"
-          head -c 300 rss/qqnews-rank.xml
+          echo "=== 知乎热榜 ==="
+          curl -sL -o rss/zhihu-hotlist.xml http://localhost:1200/zhihu/hotlist
+          head -3 rss/zhihu-hotlist.xml
           echo ""
 
       - name: 📋 列出输出文件
