@@ -5,6 +5,9 @@ on:
     - cron: '0 */2 * * *'
   workflow_dispatch:
 
+permissions:
+  contents: write   # 允许 push RSS 文件回仓库
+
 jobs:
   fetch-rss:
     runs-on: ubuntu-latest
@@ -18,33 +21,54 @@ jobs:
           docker run -d --name rsshub -p 1200:1200 diygod/rsshub
           echo "等待 RSSHub 启动..."
           for i in $(seq 1 30); do
-            if curl -s http://localhost:1200/ > /dev/null 2>&1; then
+            if curl -s -o /dev/null -w '%{http_code}' http://localhost:1200/ 2>/dev/null | grep -q 200; then
               echo "✅ RSSHub 已就绪"
               break
             fi
             sleep 2
           done
 
-      - name: 📥 抓取腾讯新闻 RSS
+      - name: 🔍 探测可用路由
+        run: |
+          echo "=== 根路由 ==="
+          curl -s -o /dev/null -w 'HTTP %{http_code}, Size: %{size_download}\n' http://localhost:1200/
+          
+          echo "=== 探测腾讯新闻路由 ==="
+          for path in \
+            /tencent/news \
+            /tencent \
+            /qq/news \
+            /new/qnews \
+            /tengxun \
+            /tengxunxinwen \
+            /news/qq \
+            /news/tencent; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:1200${path}" 2>/dev/null)
+            size=$(curl -s -o "$(mktemp)" "http://localhost:1200${path}" 2>/dev/null && wc -c < "$_")
+            echo "  $path → HTTP $code, ${size}bytes"
+          done
+
+      - name: 📥 抓取 RSS
         run: |
           mkdir -p rss
           
+          # 使用正确的路由路径
           echo "=== 腾讯新闻-首页信息流 ==="
           curl -sL -o rss/qqnews.xml http://localhost:1200/tencent/news
-          head -3 rss/qqnews.xml
+          echo "文件大小: $(wc -c < rss/qqnews.xml) bytes, 开头:"
+          head -c 200 rss/qqnews.xml
+          echo ""
           
           echo "=== 腾讯新闻-综合热榜 ==="
           curl -sL -o rss/qqnews-rank.xml http://localhost:1200/tencent/news/rank
-          head -3 rss/qqnews-rank.xml
-          
-          echo "=== 腾讯新闻-热点榜 ==="
-          curl -sL -o rss/qqnews-hot.xml http://localhost:1200/tencent/news/rank?type=hotSpot
-          head -3 rss/qqnews-hot.xml
+          echo "文件大小: $(wc -c < rss/qqnews-rank.xml) bytes, 开头:"
+          head -c 200 rss/qqnews-rank.xml
+          echo ""
 
       - name: 📋 列出输出文件
         run: ls -lh rss/
 
-      - name: 🧹 清理 Docker 容器
+      - name: 🧹 清理 Docker
         if: always()
         run: docker rm -f rsshub 2>/dev/null || true
 
