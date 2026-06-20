@@ -40,10 +40,16 @@ const SPECIAL = {
     const html = await res.text();
     const items = []; const seen = new Set();
 
-    const m = html.match(/__NEXT_DATA__[^>]*>({.*?})<\/script>/);
-    if (m) {
+    const nextDataIdx = html.indexOf('__NEXT_DATA__');
+    let jsonStr = null;
+    if (nextDataIdx >= 0) {
+      const start = html.indexOf('>', nextDataIdx) + 1;
+      const end = html.indexOf('</script>', start);
+      if (end > start) jsonStr = html.slice(start, end);
+    };
+    if (jsonStr) {
       try {
-        const data = JSON.parse(m[1]);
+        const data = JSON.parse(jsonStr);
         const pd = data?.props?.pageProps?.data || {};
         const all = [];
         for (const k of Object.keys(pd)) {
