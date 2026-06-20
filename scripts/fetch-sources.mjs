@@ -84,30 +84,55 @@ async function puppeteerScrape(url, domain) {
   } finally { await b.close().catch(()=>{}); }
 }
 
-/** 三联生活周刊: Puppeteer 渲染提取（避免 CSS 字体链接污染） */
+/** 三联生活周刊: 简单爬虫提取标题和 SVG 中的 URL */
 async function scrapeLifeweek() {
-  const pp = (await import('puppeteer')).default;
-  const b = await pp.launch({headless:true, args:['--no-sandbox','--disable-setuid-sandbox','--disable-dev-shm-usage']});
-  try {
-    const pg = await b.newPage();
-    await pg.setUserAgent('Mozilla/5.0 Chrome/125');
-    await pg.setViewport({width:1440,height:900});
-    await pg.goto('https://www.lifeweek.com.cn/', {waitUntil:'networkidle2',timeout:25000});
-    await pg.evaluate(() => new Promise(r => setTimeout(r,3000)));
-    const items = await pg.evaluate(() => {
-      const r=[],s=new Set();
-      for (const a of document.querySelectorAll('a[href*="lifeweek.com.cn/article/"], a[href*="lifeweek.com.cn/detail/"]')) {
-        const t=(a.textContent||a.innerText||'').replace(/\s+/g,' ').trim();
-        if (t.length>5 && a.href && !s.has(a.href)) { s.add(a.href); r.push({t,l:a.href.split('?')[0],p:new Date().toUTCString()}); }
-      }
-      return r;
-    });
-    if (!items.length) throw new Error('No article links found');
-    return items.slice(0,30);
-  } finally { await b.close().catch(()=>{}); }
+  const res = await fetch('https://www.lifeweek.com.cn/', {
+    headers: {'User-Agent':'Mozilla/5.0 Chrome/125','Accept-Language':'zh-CN,zh;q=0.9'},
+    signal: AbortSignal.timeout(15000),
+  });
+  const html = await res.text();
+  const items = []; const seen = new Set();
+  // 只匹配真正的 /article/ 或 /detail/ 路径链接
+  const re = /https?:\/\/[^"']*lifeweek\.com\.cn\/(?:article|detail)\/[^"'\s]+/g;
+  const urls = [...new Set(html.match(re) || [])];
+  // 从页面中提取中文标题
+  const titles = [...html.matchAll(/<title>([^<]+)<\/title>/g)];
+  const h2titles = [...html.matchAll(/<h2[^>]*>([^<]{8,})<\/h2>/g)];
+  const h3titles = [...html.matchAll(/<h3[^>]*>([^<]{8,})<\/h3>/g)];
+  const allTitles = [...titles, ...h2titles, ...h3titles].map(m=>m[1].trim()).filter(t=>!t.includes('lifeweek')&&t.length>5);
+  for (let i = 0; i < urls.length; i++) {
+    const t = allTitles[i] || '三联生活周刊文章';
+    if (!seen.has(urls[i])) { seen.add(urls[i]); items.push({t, l: urls[i], p: new Date().toUTCString()}); }
+  }
+  if (items.length < 3) {
+    // Puppeteer 兜底
+    try {
+      const pp = (await import('puppeteer')).default;
+      const b = await pp.launch({headless:true, args:['--no-sandbox','--disable-setuid-sandbox','--disable-dev-shm-usage']});
+      try {
+        const pg = await b.newPage();
+        await pg.setUserAgent('Mozilla/5.0 Chrome/125');
+        await pg.setViewport({width:1440,height:900});
+        await pg.goto('https://www.lifeweek.com.cn/', {waitUntil:'networkidle2',timeout:20000});
+        await pg.evaluate(() => new Promise(r => setTimeout(r,2000)));
+        const pi = await pg.evaluate(() => {
+          const r=[],s=new Set();
+          for (const a of document.querySelectorAll('a[href*="/article/"],a[href*="/detail/"]')) {
+            const t=(a.textContent||'').replace(/\s+/g,' ').trim();
+            if (t.length>5 && a.href.includes('lifeweek') && !s.has(a.href)) { s.add(a.href); r.push({t,l:a.href.split('?')[0],p:new Date().toUTCString()}); }
+          }
+          return r;
+        });
+        items.push(...pi);
+      } finally { await b.close().catch(()=>{}); }
+    } catch {}
+  }
+  if (!items.length) throw new Error('No items from lifeweek');
+  const unique = items.filter((x,i,a) => a.findIndex(y=>y.l===x.l)===i);
+  return unique.slice(0,30);
 }
 
-/** 澎湃新闻: 正则提取 newsDetail_forward_ / Puppeteer 兜底 */
+/** 澎湃新闻: URL 正则提取（简单可靠） */
 async function scrapeThepaper() {
   const res = await fetch('https://www.thepaper.cn/', {
     headers: {'User-Agent':'Mozilla/5.0 Chrome/125','Accept-Language':'zh-CN,zh;q=0.9'},
@@ -116,39 +141,19 @@ async function scrapeThepaper() {
   const html = await res.text();
   const items = []; const seen = new Set();
 
-  // __NEXT_DATA__ positional extract
-  const ndx = html.indexOf('__NEXT_DATA__');
-  if (ndx >= 0) {
-    const s = html.indexOf('>', ndx) + 1;
-    const e = html.indexOf('</script>', s);
-    if (e > s) {
-      try {
-        const data = JSON.parse(html.slice(s, e));
-        const pd = data.props.pageProps.data || {};
-        for (const k of Object.keys(pd)) {
-          const arr = pd[k];
-          if (Array.isArray(arr)) {
-            for (const item of arr) {
-              const t = item.name || item.title || '';
-              const id = item.contId || item.id || '';
-              const l = id ? 'https://www.thepaper.cn/newsDetail_forward_' + id : '';
-              if (t && l && t.length > 5 && !seen.has(l)) {
-                seen.add(l);
-                items.push({t: t.replace(/[\uD800-\uDFFF]/g,'').trim(), l, p: new Date().toUTCString()});
-              }
-            }
-          }
-        }
-      } catch {}
+  // URL 正则提取
+  const urls = new Set(html.match(/newsDetail_forward_\d+/g) || []);
+  for (const u of urls) {
+    if (!seen.has(u)) {
+      seen.add(u);
+      items.push({t:'澎湃新闻', l:'https://www.thepaper.cn/' + u, p: new Date().toUTCString()});
     }
   }
 
-  // URL regex fallback
-  if (!items.length) {
-    const urls = new Set(html.match(/newsDetail_forward_\d+/g) || []);
-    for (const u of urls) {
-      items.push({t:'澎湃新闻', l:'https://www.thepaper.cn/' + u, p: new Date().toUTCString()});
-    }
+  // 从页面提取标题（如果有）
+  const titles = [...html.matchAll(/"name"\s*:\s*"([^"]{8,})"/g)];
+  for (let i = 0; i < Math.min(titles.length, items.length); i++) {
+    items[i].t = titles[i][1].replace(/[\uD800-\uDFFF]/g,'');
   }
 
   if (!items.length) throw new Error('No items from thepaper');
@@ -165,8 +170,8 @@ const SOURCES = [
   {id:'jiemian', label:'界面新闻',     url:'https://www.jiemian.com/',          domain:'jiemian.com',   rsshub:'/jiemian'},
   {id:'qqnews',  label:'腾讯新闻',     url:'https://news.qq.com/',              domain:'news.qq.com',   puppeteer:true},
 
-  // 新增源
-  {id:'medium',  label:'Medium',      url:'https://medium.com/',               domain:'medium.com',    rsshub:'/medium'},
+  // 新增源 (RSSHub已知路由)
+  {id:'medium',  label:'Medium',      url:'https://medium.com/',               domain:'medium.com'},
   {id:'bilibili',label:'B站热门',      url:'https://www.bilibili.com/',         domain:'bilibili.com',  rsshub:'/bilibili/popular'},
   {id:'douyin',  label:'抖音热点',     url:'https://www.douyin.com/',           domain:'douyin.com',    puppeteer:true},
   {id:'youtube', label:'YouTube热榜',  url:'https://www.youtube.com/feed/trending', domain:'youtube.com', rsshub:'/youtube/trending'},
