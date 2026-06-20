@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>腾讯新闻 RSS 订阅源</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;max-width:640px;margin:40px auto;padding:0 20px;color:#333;line-height:1.6}
+  h1{color:#e74c3c;border-bottom:2px solid #fde8e8;padding-bottom:12px}
+  ul{padding:0;list-style:none}
+  li{margin:16px 0;padding:16px;background:#f8f9fa;border-radius:8px;border:1px solid #e0e0e0}
+  li:hover{background:#fde8e8;border-color:#e74c3c}
+  a{color:#e74c3c;text-decoration:none;font-size:18px;font-weight:500}
+  a:hover{text-decoration:underline}
+  .desc{font-size:13px;color:#666;margin-top:4px}
+  .badge{display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;margin-left:8px;background:#e74c3c;color:#fff}
+  footer{margin-top:40px;font-size:12px;color:#999;border-top:1px solid #eee;padding-top:12px}
+  .back{font-size:14px;margin-bottom:20px}
+  .back a{color:#666;text-decoration:none}
+  .back a:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+<div class="back"><a href="/">← 返回主页</a></div>
+<h1>📰 腾讯新闻 RSS</h1>
+<p>由 GitHub Actions + RSSHub 定时抓取，每 2 小时自动更新。</p>
+<ul>
+  <li>
+    <a href="qqnews.xml">腾讯新闻 · 首页信息流 <span class="badge">RSS</span></a>
+    <div class="desc">news.qq.com 首页全品类新闻信息流</div>
+  </li>
+  <li>
+    <a href="qqnews-rank.xml">腾讯新闻 · 综合热榜 <span class="badge">RSS</span></a>
+    <div class="desc">腾讯新闻热榜，综合热度排序</div>
+  </li>
+  <li>
+    <a href="qqnews-hot.xml">腾讯新闻 · 实时热点榜 <span class="badge">RSS</span></a>
+    <div class="desc">腾讯新闻实时热点排行榜</div>
+  </li>
+</ul>
+<p>📥 <strong>订阅方式：</strong>在 RSS 阅读器中添加以上链接即可。</p>
+
+<h2 style="margin-top:32px">🔗 订阅链接（直接复制）</h2>
+<pre style="background:#f4f4f4;padding:12px;border-radius:6px;font-size:13px;overflow-x:auto">
+https://zhouqun197746.github.io/index.html/rss/qqnews.xml
+https://zhouqun197746.github.io/index.html/rss/qqnews-rank.xml
+https://zhouqun197746.github.io/index.html/rss/qqnews-hot.xml
+</pre>
+
+<footer>
+  Powered by <a href="https://github.com/DIYgod/RSSHub">RSSHub</a> ·
+  部署于 GitHub Actions ·
+  <a href="https://github.com/zhouqun197746/index.html/actions/workflows/qqnews-rss.yml">查看运行状态</a>
+</footer>
+</body>
+</html>

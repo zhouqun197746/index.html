@@ -1,0 +1,42 @@
+name: 📰 QQ News RSS (RSSHub)
+
+on:
+  schedule:
+    - cron: '0 */2 * * *'
+  workflow_dispatch:
+
+jobs:
+  fetch-rss:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: ⬇️ 检出代码
+        uses: actions/checkout@v4
+
+      - name: 🔧 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 📦 安装 RSSHub
+        run: |
+          npm init -y > /dev/null 2>&1
+          npm install rsshub
+
+      - name: 🚀 启动 RSSHub & 抓取腾讯新闻
+        run: node scripts/fetch-qqnews-rss.mjs
+
+      - name: 📋 列出输出文件
+        run: ls -lh rss/
+
+      - name: 📤 提交 RSS 文件回仓库
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add rss/
+          if git diff --cached --quiet; then
+            echo "ℹ️ RSS 文件无变化，跳过提交"
+          else
+            git commit -m "🤖 RSS 定时更新 $(date '+%Y-%m-%d %H:%M')"
+            git push
+          fi
