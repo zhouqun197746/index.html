@@ -1,6 +1,41 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
-<channel><title>三联生活周刊 - N/A</title><link>https://www.lifeweek.com.cn/</link><description>N/A</description><language>zh-CN</language>
+<channel><title>三联生活周刊</title><link>https://www.lifeweek.com.cn/</link><description>三联生活周刊</description><language>zh-CN</language>
 <atom:link href="https://zhouqun197746.github.io/index.html/rss/lifeweek.xml" rel="self" type="application/rss+xml"/>
 
+    <item>
+      <title><![CDATA[三联生活周刊]]></title>
+      <link><![CDATA[https://www.lifeweek.com.cn/]]></link>
+      <guid isPermaLink="true"><![CDATA[https://www.lifeweek.com.cn/]]></guid>
+      <description><![CDATA[三联生活周刊]]></description>
+      <pubDate>Fri, 17 Jul 2026 02:43:54 GMT</pubDate>
+    </item>
+    <item>
+      <title><![CDATA[刘晓蕾·给少年的《红楼梦》100讲]]></title>
+      <link><![CDATA[https://www.lifeweek.com.cn/h5/zhuanlan/detail.do?id=4976&from=]]></link>
+      <guid isPermaLink="true"><![CDATA[https://www.lifeweek.com.cn/h5/zhuanlan/detail.do?id=4976&from=]]></guid>
+      <description><![CDATA[刘晓蕾·给少年的《红楼梦》100讲]]></description>
+      <pubDate>Fri, 17 Jul 2026 02:43:54 GMT</pubDate>
+    </item>
+    <item>
+      <title><![CDATA[韩田鹿·妙解《西游记》100回]]></title>
+      <link><![CDATA[https://www.lifeweek.com.cn/h5/zhuanlan/detail.do?id=2949&from=]]></link>
+      <guid isPermaLink="true"><![CDATA[https://www.lifeweek.com.cn/h5/zhuanlan/detail.do?id=2949&from=]]></guid>
+      <description><![CDATA[韩田鹿·妙解《西游记》100回]]></description>
+      <pubDate>Fri, 17 Jul 2026 02:43:54 GMT</pubDate>
+    </item>
+    <item>
+      <title><![CDATA[热门数字刊榜]]></title>
+      <link><![CDATA[https://www.lifeweek.com.cn/ranking/11]]></link>
+      <guid isPermaLink="true"><![CDATA[https://www.lifeweek.com.cn/ranking/11]]></guid>
+      <description><![CDATA[热门数字刊榜]]></description>
+      <pubDate>Fri, 17 Jul 2026 02:43:54 GMT</pubDate>
+    </item>
+    <item>
+      <title><![CDATA[zhongdu@lifeweek.com.cn]]></title>
+      <link><![CDATA[mailto:zhongdu@lifeweek.com.cn]]></link>
+      <guid isPermaLink="true"><![CDATA[mailto:zhongdu@lifeweek.com.cn]]></guid>
+      <description><![CDATA[zhongdu@lifeweek.com.cn]]></description>
+      <pubDate>Fri, 17 Jul 2026 02:43:54 GMT</pubDate>
+    </item>
 </channel></rss>
