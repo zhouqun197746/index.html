@@ -1,48 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
-<channel><title>抖音热点</title><link>https://www.douyin.com/</link><description>抖音热点</description><language>zh-CN</language>
+<channel><title>抖音热点 - N/A</title><link>https://www.douyin.com/</link><description>N/A</description><language>zh-CN</language>
 <atom:link href="https://zhouqun197746.github.io/index.html/rss/douyin.xml" rel="self" type="application/rss+xml"/>
 
-    <item>
-      <title><![CDATA[Topick]]></title>
-      <link><![CDATA[https://www.douyin.com/jingxuan?from_nav=1]]></link>
-      <guid isPermaLink="true"><![CDATA[https://www.douyin.com/jingxuan?from_nav=1]]></guid>
-      <description><![CDATA[Topick]]></description>
-      <pubDate>Wed, 26 Aug 2026 12:54:24 GMT</pubDate>
-    </item>
-    <item>
-      <title><![CDATA[For You]]></title>
-      <link><![CDATA[https://www.douyin.com/?recommend=1&from_nav=1]]></link>
-      <guid isPermaLink="true"><![CDATA[https://www.douyin.com/?recommend=1&from_nav=1]]></guid>
-      <description><![CDATA[For You]]></description>
-      <pubDate>Wed, 26 Aug 2026 12:54:24 GMT</pubDate>
-    </item>
-    <item>
-      <title><![CDATA[Following]]></title>
-      <link><![CDATA[https://www.douyin.com/follow?from_nav=1]]></link>
-      <guid isPermaLink="true"><![CDATA[https://www.douyin.com/follow?from_nav=1]]></guid>
-      <description><![CDATA[Following]]></description>
-      <pubDate>Wed, 26 Aug 2026 12:54:24 GMT</pubDate>
-    </item>
-    <item>
-      <title><![CDATA[Friends]]></title>
-      <link><![CDATA[https://www.douyin.com/friend?from_nav=1]]></link>
-      <guid isPermaLink="true"><![CDATA[https://www.douyin.com/friend?from_nav=1]]></guid>
-      <description><![CDATA[Friends]]></description>
-      <pubDate>Wed, 26 Aug 2026 12:54:24 GMT</pubDate>
-    </item>
-    <item>
-      <title><![CDATA[Profile]]></title>
-      <link><![CDATA[https://www.douyin.com/user/self?from_nav=1]]></link>
-      <guid isPermaLink="true"><![CDATA[https://www.douyin.com/user/self?from_nav=1]]></guid>
-      <description><![CDATA[Profile]]></description>
-      <pubDate>Wed, 26 Aug 2026 12:54:24 GMT</pubDate>
-    </item>
-    <item>
-      <title><![CDATA[Client]]></title>
-      <link><![CDATA[https://www.douyin.com/jingxuan]]></link>
-      <guid isPermaLink="true"><![CDATA[https://www.douyin.com/jingxuan]]></guid>
-      <description><![CDATA[Client]]></description>
-      <pubDate>Wed, 26 Aug 2026 12:54:24 GMT</pubDate>
-    </item>
 </channel></rss>
