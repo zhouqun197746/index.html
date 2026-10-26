@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
-<channel><title>小红书热门 - N/A</title><link>https://www.xiaohongshu.com/</link><description>N/A</description><language>zh-CN</language>
+<channel><title>小红书热门</title><link>https://www.xiaohongshu.com/</link><description>小红书热门</description><language>zh-CN</language>
 <atom:link href="https://zhouqun197746.github.io/index.html/rss/xiaohongshu.xml" rel="self" type="application/rss+xml"/>
 
+    <item>
+      <title><![CDATA[Children and Teenagers' Personal Information Protection Policy]]></title>
+      <link><![CDATA[https://oa.xiaohongshu.com/h5/terms/ZXXY20220516001/-1]]></link>
+      <guid isPermaLink="true"><![CDATA[https://oa.xiaohongshu.com/h5/terms/ZXXY20220516001/-1]]></guid>
+      <description><![CDATA[Children and Teenagers' Personal Information Protection Policy]]></description>
+      <pubDate>Mon, 26 Oct 2026 18:23:28 GMT</pubDate>
+    </item>
 </channel></rss>
